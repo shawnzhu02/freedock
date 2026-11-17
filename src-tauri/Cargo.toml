@@ -1,0 +1,92 @@
+[package]
+name = "freedock"
+version = "0.1.0"
+description = "A glass dock with live widgets for Windows"
+authors = ["freedock contributors"]
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "freedock_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri-plugin-single-instance = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-autostart = "2"
+tokio = { version = "1", features = ["sync", "macros"] }
+png = "0.18"
+base64 = "0.23"
+systray-util = "0.2"
+ureq = "2"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10.4"
+rrule = "0.14.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-core = "0.62"
+webview2-com = "0.39"
+windows = { version = "0.62", features = [
+  "Devices_Radios",
+  "Networking_Connectivity",
+  "Networking_NetworkOperators",
+  "Win32_Devices_Display",
+  "Foundation_Collections",
+  "Media_Control",
+  "Storage_Streams",
+  "Win32_Foundation",
+  "Win32_Devices_FunctionDiscovery",
+  "Win32_Media_Audio",
+  "Win32_Media_Audio_Endpoints",
+  "Win32_NetworkManagement_Ndis",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_ProcessStatus",
+  "Win32_System_SystemInformation",
+  "Win32_NetworkManagement_WiFi",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Variant",
+  "Win32_UI_Shell_PropertiesSystem",
+  "Win32_Globalization",
+  "Win32_Graphics_Dwm",
+  "Win32_Graphics_Gdi",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
+  "Win32_System_Performance",
+  "Win32_Security_Cryptography",
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Com",
+  "Win32_System_Registry",
+  "Win32_System_Search",
+  "Win32_System_Power",
+  "Win32_System_Shutdown",
+  "Win32_System_Threading",
+  "Win32_UI_Accessibility",
+  "Win32_UI_HiDpi",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

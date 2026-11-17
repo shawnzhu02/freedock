@@ -1,0 +1,15 @@
+name: Widget idea
+description: A widget, flyout or setting you'd like
+labels: [idea]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should it show or do?
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Where does the data come from?
+      description: Built-in widgets use APIs that need no key or account. Ideas that need one are still welcome as recipes in docs/CUSTOMIZING.md.

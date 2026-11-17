@@ -1,0 +1,26 @@
+name: Bug
+description: Something doesn't work
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: input
+    id: version
+    attributes:
+      label: freedock version and Windows version (e.g. 0.1.0, Windows 11 24H2)
+  - type: textarea
+    id: setup
+    attributes:
+      label: Setup
+      description: Number of monitors and their scaling, dock position and style, widgets involved.
+  - type: markdown
+    attributes:
+      value: "If the Windows taskbar stays hidden, run `freedock.exe --restore-taskbar`."

@@ -1,0 +1,497 @@
+/* One row of rounded cells on a glass bar (the look of lumabar's screenshots, our own CSS).
+   Each style sets colour tokens only; the glass styles get their fill from the shader in Glass.tsx. */
+:root {
+  --bg: rgba(22, 24, 30, 0.55);
+  --edge: rgba(255, 255, 255, 0.22);
+  --cell: rgba(255, 255, 255, 0.07);
+  --cell-edge: rgba(255, 255, 255, 0.07);
+  --cell-hover: rgba(255, 255, 255, 0.13);
+  --ink: #fff;
+  --ink2: rgba(255, 255, 255, 0.62);
+  /* the ink as r, g, b, for faint fills and lines in the ink's colour: rgba(var(--fg-rgb), .2) */
+  --fg-rgb: 255, 255, 255;
+  --accent: #ff453a;
+  --radius: 16px;
+  font-family: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  color: var(--ink);
+}
+html, body, #root { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
+.style-tinted { --bg: rgba(80, 120, 220, 0.4); }
+.style-midnight { --bg: rgba(10, 14, 30, 0.8); --edge: rgba(255, 255, 255, 0.14); }
+.style-black { --bg: #0b0b0d; --edge: #26262a; }
+.style-white { --bg: rgba(248, 248, 250, 0.96); --edge: #ddd; --ink: #111; --ink2: #666; --fg-rgb: 0, 0, 0;
+  --cell: rgba(0, 0, 0, 0.045); --cell-edge: rgba(0, 0, 0, 0.06); --cell-hover: rgba(0, 0, 0, 0.09); }
+.style-clear { --bg: transparent; --edge: transparent; --cell: rgba(20, 20, 24, 0.45); }
+
+.dock {
+  /* set here, not only on :root, so each style's --ink actually reaches the text */
+  color: var(--ink);
+  position: relative; isolation: isolate; box-sizing: border-box; height: 100%; display: flex; align-items: center;
+  padding: 0 7px; background: var(--bg); border: 1px solid var(--edge); border-radius: var(--radius);
+}
+.shape-full { border-radius: 0; border-width: 1px 0 0; }
+/* the shader draws the glass, its rim and its rounded edge itself, so the CSS fill and border step aside */
+.dock.has-glass { background: transparent; border-color: transparent; }
+.glass { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); z-index: -1; pointer-events: none; }
+.has-glass { text-shadow: 0 1px 2px rgba(0, 0, 0, .3); }
+
+/* a pill measures this row (max-content) and resizes the window to hug it */
+.row { display: flex; align-items: center; gap: 5px; height: calc(100% - 10px); }
+.shape-pill .row { width: max-content; flex: none; }
+.shape-full .row { width: 100%; }
+.grow { flex: 1; min-width: 0; }
+
+/* cells: the dock's segments */
+.cell {
+  box-sizing: border-box; height: 100%; display: flex; align-items: center; gap: 8px; padding: 0 12px; margin: 0;
+  border: 1px solid var(--cell-edge); border-radius: 11px; background: var(--cell); color: inherit; font: inherit;
+  transition: background .15s;
+}
+button.cell { cursor: pointer; }
+/* Only cells you can click light up; a cell that holds several buttons (.group) lets each button light up instead. */
+button.cell:hover, a.cell:hover { background: var(--cell-hover); }
+button.cell:active, .cell.group > button:active { filter: brightness(.92); }
+
+.start { width: 44px; padding: 0; justify-content: center; }
+.start svg { fill: currentColor; opacity: .92; }
+
+.date, .time { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; line-height: 1.12; }
+.date small { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.date b { font-size: 15px; font-weight: 650; }
+.time { align-items: flex-end; min-width: 76px; }
+.time b { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.time sup { font-size: 9px; font-weight: 700; margin-left: 2px; vertical-align: 0; }
+
+/* Apps: one cell of icons; icons grow a little on hover (Mac-style magnification, kept inside the dock) */
+.apps { padding: 0 4px; gap: 2px; }
+.apps:hover { background: var(--cell); }
+.app { position: relative; width: calc(var(--icon, 30px) + 10px); height: 100%; display: grid; place-items: center; padding: 0; border: 0;
+  border-radius: 9px; background: transparent; cursor: pointer; transition: background .15s; }
+.app img, .app .glyph { width: var(--icon, 30px); height: var(--icon, 30px); transition: transform .18s cubic-bezier(.2, .8, .2, 1);
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .3)); }
+.app .glyph { display: grid; place-items: center; border-radius: 8px; background: rgba(var(--fg-rgb), .2); font-weight: 600; }
+.app:hover img, .app:hover .glyph { transform: scale(var(--magnify, 1.18)) translateY(-1px); }
+.app:hover + .app img, .app:has(+ .app:hover) img { transform: scale(calc(1 + (var(--magnify, 1.18) - 1) / 3)); }
+.app.active { background: rgba(var(--fg-rgb), .1); }
+.app .dot { position: absolute; bottom: 1px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%;
+  background: #4ea1ff; }
+.app.active .dot { width: 12px; margin-left: -6px; border-radius: 2px; }
+@keyframes attention { 50% { background: rgba(255, 170, 60, .45); } }
+.app.flashing { animation: attention 1s ease-in-out infinite; }
+
+/* Background apps: icons open inline from the chevron */
+.tray { padding: 0 4px; gap: 1px; }
+.tray .chev, .tray .ticon { width: 28px; height: 100%; display: grid; place-items: center; border: 0; padding: 0; background: transparent;
+  color: inherit; border-radius: 8px; cursor: pointer; }
+.tray .ticon img { width: 18px; height: 18px; }
+.tray .ticon:hover, .tray .chev:hover { background: var(--cell-hover); }
+
+/* Quick settings glyphs */
+.system { gap: 9px; padding: 0 11px; }
+.batt { position: relative; width: 22px; height: 11px; border: 1.5px solid currentColor; border-radius: 3.5px; box-sizing: border-box; padding: 1px; }
+.batt::after { content: ""; position: absolute; right: -4px; top: 2.5px; width: 2px; height: 4px; border-radius: 0 1px 1px 0; background: currentColor; }
+.batt i { display: block; height: 100%; border-radius: 1.5px; background: currentColor; }
+.batt i.low { background: #ff453a; }
+.batt b { position: absolute; inset: -2px 0 0; font-size: 9px; text-align: center; color: #111; text-shadow: none; }
+
+/* Tucked away (smart / auto-hide): the bar slides through the screen edge, the handle fades in.
+   Quick on purpose (0.14 s): it should feel instant, not like an animation to wait for. */
+.dock { transition: transform .14s cubic-bezier(.2, .8, .2, 1), opacity .1s; }
+.dock.tucked.edge-bottom { transform: translateY(calc(100% + 12px)); opacity: 0; }
+.dock.tucked.edge-top { transform: translateY(calc(-100% - 12px)); opacity: 0; }
+.handle { position: fixed; left: 50%; width: 96px; height: 7px; margin-left: -48px; border-radius: 4px; pointer-events: none;
+  background: rgba(255, 255, 255, .6); box-shadow: 0 0 0 .5px rgba(0, 0, 0, .25), 0 1px 4px rgba(0, 0, 0, .35);
+  opacity: 0; transform: scaleX(.6); transition: opacity .12s, transform .12s; }
+.handle.edge-bottom { bottom: 1px; }
+.handle.edge-top { top: 1px; }
+.handle.on { opacity: 1; transform: none; }
+
+.dock.tucked.edge-left { transform: translateX(calc(-100% - 12px)); opacity: 0; }
+.dock.tucked.edge-right { transform: translateX(calc(100% + 12px)); opacity: 0; }
+.handle.edge-left, .handle.edge-right { top: 50%; left: auto; width: 7px; height: 96px; margin: -48px 0 0; transform: scaleY(.6); }
+.handle.edge-left { left: 1px; }
+.handle.edge-right { right: 1px; }
+.handle.edge-left.on, .handle.edge-right.on { transform: none; }
+
+/* Upright docks (left and right edges): the same cells, stacked */
+.dock.vertical { flex-direction: column; justify-content: center; padding: 7px 0; }
+.vertical .row { flex-direction: column; width: calc(100% - 10px); height: auto; }
+.shape-pill.vertical .row { width: calc(100% - 10px); height: max-content; }
+.shape-full.vertical .row { height: 100%; }
+.vertical .cell { width: 100%; height: auto; flex-direction: column; padding: 8px 0; gap: 6px; }
+.vertical .start { width: 100%; height: 44px; padding: 0; }
+.vertical .apps { padding: 4px 0; gap: 2px; }
+.vertical .app { width: 100%; height: calc(var(--icon, 30px) + 10px); }
+.vertical .app:hover img, .vertical .app:hover .glyph { transform: scale(var(--magnify, 1.18)); }
+.vertical.edge-left .app .dot { left: 1px; }
+.vertical.edge-right .app .dot { left: auto; right: 1px; }
+.vertical .app .dot { bottom: auto; top: 50%; margin: -2px 0 0; }
+.vertical .app.active .dot { width: 4px; height: 12px; margin: -6px 0 0; }
+.vertical .tray { padding: 4px 0; }
+.vertical .tray .chev, .vertical .tray .ticon { width: 100%; height: 28px; }
+.vertical .tray .chev svg { transform: rotate(90deg); }
+.vertical .date, .vertical .time { align-items: center; min-width: 0; line-height: 1.05; }
+.vertical .date b { font-size: 17px; }
+.vertical .time b { font-size: 16px; }
+
+/* Move mode: a dashed outline, the whole dock is a handle, and a Done cell to finish */
+.dock.editing { cursor: grab; outline: 2px dashed rgba(255, 255, 255, .75); outline-offset: -3px; }
+.dock.editing .cell:not(.done) { pointer-events: none; opacity: .8; }
+.cell.done { cursor: pointer; padding: 0 14px; font-weight: 650; background: var(--accent); border-color: transparent; color: #fff; }
+.vertical .cell.done { padding: 8px 0; font-size: 12px; }
+
+/* Agents */
+.agent { width: 44px; padding: 0; justify-content: center; }
+.vertical .agent { width: 100%; height: 40px; }
+.agenda { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; line-height: 1.12; max-width: 230px; }
+.agenda small { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64d2ff; }
+.agenda b { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.vertical .agenda { align-items: center; }
+
+/* Next meeting */
+.meeting { padding: 0 4px 0 0; gap: 6px; max-width: 250px; }
+.meeting .mmain { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; line-height: 1.12; border: 0; background: transparent;
+  color: inherit; padding: 0 6px 0 10px; height: 100%; min-width: 0; cursor: pointer; border-radius: inherit; }
+button.cell.meeting { flex-direction: column; align-items: flex-start; justify-content: center; line-height: 1.12; padding: 0 10px; }
+.meeting small { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink2, rgba(255,255,255,.6)); }
+.meeting.soon small, .meeting.now small { color: #ffd60a; }
+.meeting.now small { color: #30d158; }
+.meeting b { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
+.meeting .join { border: 0; border-radius: 8px; background: #30d158; color: #062b10; font-weight: 700; font-size: 11.5px; padding: 5px 10px; cursor: pointer; }
+.meeting .join:hover { filter: brightness(1.1); }
+.vertical .meeting { flex-direction: column; padding: 4px 0; }
+.vertical .meeting .mmain { align-items: center; padding: 0; }
+
+/* Now Playing */
+.media { padding: 0 4px 0 0; gap: 2px; max-width: 280px; }
+.media .mmain { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; color: inherit; padding: 0 4px 0 6px; height: 100%;
+  min-width: 0; cursor: pointer; border-radius: inherit; }
+.media img, .media .noart { width: 30px; height: 30px; border-radius: 7px; object-fit: cover; flex: none; }
+.media .noart { display: grid; place-items: center; background: rgba(var(--fg-rgb), .1); font-size: 14px; }
+.media .mtext { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; min-width: 0; }
+.media .mtext b { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.media .mtext small { font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.media .mbtn { border: 0; background: transparent; color: inherit; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex: none; }
+.media .mbtn:hover { background: var(--cell-hover); }
+.media.idle { opacity: .6; padding: 0 12px; }
+.vertical .media { flex-direction: column; padding: 4px 0; }
+.vertical .media .mmain { padding: 0; }
+
+/* Not enough room: text cells get narrower (tight1), then show only their label or cover (tight2). */
+.tight1 .agenda { max-width: 150px; }
+.tight1 .meeting b, .tight1 .media .mtext b, .tight1 .media .mtext small { max-width: 100px; }
+.tight1 .meeting { max-width: 170px; }
+.tight2 .agenda b, .tight2 .meeting .mmain b, .tight2 .media .mtext { display: none; }
+.tight2 .agenda, .tight2 .meeting { max-width: 120px; }
+
+/* Claude usage */
+.usage { gap: 8px; padding: 0 12px 0 10px; }
+.usage .ring { color: #64d2ff; flex: none; }
+.usage .ring.high { color: #ffd60a; }
+.usage .ring.max { color: #ff453a; }
+.usage .utext { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.12; }
+.usage .utext small { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .65; }
+.usage .utext b { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.usage .utext i { font-style: normal; font-weight: 500; opacity: .6; font-size: 11.5px; }
+.usage.max .utext b { color: #ff6961; }
+.vertical .usage { padding: 0; justify-content: center; }
+.tight2 .usage .utext i { display: none; }
+
+/* System stats */
+.stat { gap: 7px; padding: 0 11px; }
+.stat .stext { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.12; }
+.stat .stext small { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .65; white-space: nowrap; }
+.stat .stext b { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+.stat .spark { color: #64d2ff; opacity: .9; }
+.stat.high .spark { color: #ffd60a; }
+.stat.max .spark, .stat.max .stext b { color: #ff6961; }
+.stat.net { flex-direction: column; justify-content: center; align-items: flex-start; gap: 0; font-size: 11px; font-variant-numeric: tabular-nums;
+  line-height: 1.2; min-width: 78px; }
+.stat.net .nrow i { font-style: normal; opacity: .55; margin-right: 4px; }
+.vertical .stat { padding: 4px 0; justify-content: center; }
+.vertical .stat .stext { align-items: center; }
+.vertical .stat .stext small { font-size: 8px; }
+
+/* Weather */
+.wx { flex: none; overflow: visible; }
+.wx .wx-sun { fill: none; stroke: #ffd60a; stroke-width: 1.7; stroke-linecap: round; }
+.wx .wx-sun circle { fill: rgba(255, 214, 10, .25); }
+.wx .wx-moon { fill: rgba(230, 230, 255, .2); stroke: #d8d8f0; stroke-width: 1.6; stroke-linejoin: round; }
+.wx .wx-cloud { fill: rgba(var(--fg-rgb), .22); stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+.wx .wx-rain { stroke: #64d2ff; stroke-width: 1.7; stroke-linecap: round; }
+.wx .wx-snow { fill: #fff; }
+.wx .wx-fog line { stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; opacity: .8; }
+.wx .wx-bolt { fill: #ffd60a; }
+.wx .wx-arrow { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
+.weather { gap: 7px; padding: 0 12px 0 10px; }
+.weather .wtext { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.12; }
+.weather .wtext b { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.weather .wtext small { font-size: 10.5px; opacity: .65; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.weather.sun .wtext small { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.weather.sun .wtext b { font-size: 12.5px; }
+.vertical .weather { flex-direction: column; padding: 4px 0; gap: 2px; }
+.vertical .weather .wtext { align-items: center; }
+
+/* Projects */
+.projects { gap: 7px; padding: 0 12px 0 10px; font-size: 12.5px; font-weight: 600; }
+.pglyph { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; flex: none; }
+.vertical .projects { padding: 0; justify-content: center; }
+
+/* Focus */
+.focus { gap: 7px; padding: 0 12px 0 10px; }
+.fring { flex: none; color: rgba(var(--fg-rgb), .7); }
+.fring.focus { color: #ff6b5e; }
+.fring.break { color: #30d158; }
+.fring.timer { color: #64d2ff; }
+.focus .wtext { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.12; }
+.focus .wtext small { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .7; max-width: 110px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus .wtext b { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.focus.paused .wtext b { opacity: .55; }
+.focus.done { animation: fpulse 1.2s ease-in-out infinite; }
+@keyframes fpulse { 50% { background: rgba(255, 107, 94, .28); } }
+.vertical .focus { padding: 0; justify-content: center; }
+
+.wclock { cursor: default; }
+.wclock .stext b i { font-style: normal; font-size: 10px; opacity: .6; }
+
+/* Volume / mic / brightness / battery */
+.ctl { gap: 7px; padding: 0 11px; }
+.ctl .cval { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ctl.off { opacity: .6; }
+.ctl.mic.off { opacity: 1; color: #ff6961; }
+.battc .stext b { font-size: 12.5px; }
+.battc .stext small { font-size: 10px; opacity: .6; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.battc.low .stext b { color: #ff6961; }
+.vertical .ctl { padding: 0; justify-content: center; }
+
+/* Notes / Recycle Bin */
+.notes.withtext { gap: 8px; padding: 0 12px 0 10px; }
+.notes .nline { max-width: 150px; font-size: 12.5px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recycle { display: flex; align-items: center; padding: 0; gap: 0; }
+.recycle button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; height: 100%; display: flex; align-items: center; }
+.recycle .rmain { gap: 7px; padding: 0 10px; }
+.recycle .rsize { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.recycle .rempty { font-size: 11px; font-weight: 600; padding: 0 10px 0 2px; opacity: .55; }
+.recycle .rempty:hover { opacity: 1; color: #ff6961; }
+.tight1 .notes .nline { max-width: 90px; }
+.tight2 .notes .nline { display: none; }
+
+/* GitHub */
+.gh { position: relative; }
+.gh .ghbadge { position: absolute; top: 5px; right: 3px; min-width: 15px; height: 15px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #3b82f6; color: #fff; font-size: 9.5px; font-weight: 700; line-height: 15px; text-align: center; }
+.gh.failing .pglyph { color: #ff6961; }
+
+/* Vertical docks: icon-only cells keep a full cell's height instead of hugging the glyph. */
+.vertical .cell { min-height: 36px; box-sizing: border-box; flex-shrink: 0; }
+.vertical .recycle { justify-content: center; }
+.vertical .recycle .rmain { padding: 0; width: 100%; justify-content: center; }
+/* A vertical dock that runs out of room squeezes its cells, then its gaps. */
+.vertical.tight1 .cell { min-height: 30px; padding-top: 3px; padding-bottom: 3px; }
+.vertical.tight1 .row { gap: 4px; }
+.vertical.tight2 .cell { min-height: 26px; padding-top: 2px; padding-bottom: 2px; gap: 2px; }
+.vertical.tight2 .row { gap: 2px; }
+.vertical.tight2 .start, .vertical.tight2 .agent { height: 32px; }
+/* Analog clock face */
+.aface { stroke: currentColor; flex: none; }
+.aface .sec { stroke: var(--accent); }
+.aface .hub { fill: currentColor; stroke: none; }
+.time.analog { padding: 0 10px; min-width: 0; align-items: center; justify-content: center; }
+.time.both { flex-direction: row; align-items: center; gap: 8px; }
+.vertical .time.analog, .vertical .time.both { padding: 4px 0; }
+/* Stopwatch */
+.swatch { padding: 0; gap: 0; }
+.swatch button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; height: 100%; display: flex; align-items: center; }
+.swatch .swmain { gap: 7px; padding: 0 11px; }
+.swatch .swreset { padding: 0 10px 0 0; opacity: .55; font-size: 14px; }
+.swatch .swreset:hover { opacity: 1; }
+.swatch.on .pglyph { color: #34c759; }
+.swatch .cval { min-width: 34px; text-align: left; }
+.vertical .swatch .swmain { flex-direction: column; gap: 2px; padding: 4px 0; width: 100%; justify-content: center; }
+.vertical .swatch .cval { min-width: 0; font-size: 10.5px; text-align: center; }
+/* Weather: rain soon */
+.weather { position: relative; }
+.weather .wsoon { position: absolute; top: 3px; left: 4px; width: 13px; height: 13px; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, .35); border-radius: 50%; display: grid; place-items: center; background: #0a84ff; color: #fff; }
+.vertical .weather .wsoon { left: auto; right: 4px; }
+/* Claude usage: on pace to run out before the reset */
+.usage.pace .utext small::after { content: " ⚠"; color: #ffd60a; }
+/* Day timeline */
+.tline { padding: 0 10px; }
+.tline .tl { position: relative; width: 100%; height: 26px; }
+.tline .tick { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid rgba(var(--fg-rgb), .12); }
+.tline .tick small { position: absolute; bottom: -1px; left: 3px; font-size: 8.5px; font-weight: 650; opacity: .5; white-space: nowrap; }
+.tline .blk { position: absolute; top: 2px; height: 13px; border-radius: 4px; background: rgba(10, 132, 255, .55); overflow: hidden; min-width: 3px; }
+.tline .blk.next { background: rgba(10, 132, 255, .8); }
+.tline .blk.now { background: var(--accent); }
+.tline .blk em { font-style: normal; font-size: 9.5px; font-weight: 650; padding: 0 4px; line-height: 13px; white-space: nowrap; color: #fff; display: block; overflow: hidden; text-overflow: ellipsis; }
+.tline .nowmark { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.tight2 .tline { width: 140px !important; }
+/* Battery styles */
+.bring { flex: none; }
+.bring .track { fill: none; stroke: currentColor; stroke-width: 2.4; opacity: .18; }
+.bring .fill { fill: none; stroke: #34c759; stroke-width: 2.4; stroke-linecap: round; }
+.bring.low .fill { stroke: #ff6961; }
+.bring.chg .fill { stroke: #64d2ff; }
+.bring .dot, .bring .bolt { fill: currentColor; }
+.bdots { display: flex; gap: 2.5px; align-items: center; }
+.bdots i { width: 5px; height: 11px; border-radius: 2px; background: currentColor; opacity: .18; }
+.bdots i.on { background: #34c759; opacity: 1; }
+.bdots.low i.on { background: #ff6961; }
+.bdots.chg i.on { background: #64d2ff; }
+.vertical .bdots { gap: 1.5px; }
+.vertical .bdots i { width: 3.5px; height: 9px; }
+.dockerc.off { opacity: .55; }
+/* Countdown */
+.countdown { cursor: default; }
+.countdown .cdtext { display: flex; flex-direction: column; line-height: 1.1; padding: 0 4px; }
+.countdown .cdtext small { font-size: 9.5px; font-weight: 650; opacity: .6; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.countdown .cdtext b { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.countdown.soon b { color: #ffd60a; }
+.countdown.done { opacity: .55; }
+.countdown .cdv { font-size: 12px; font-weight: 700; }
+
+/* Site status */
+.sitesc .sdots { display: flex; gap: 3px; }
+.sitesc .sdots i { width: 7px; height: 7px; border-radius: 50%; background: #34c759; }
+.sitesc .sdots i.down { background: #ff453a; box-shadow: 0 0 6px #ff453a; }
+.sitesc .sdots i.wait { background: rgba(var(--fg-rgb), .3); }
+.vertical .sitesc .sdots { flex-wrap: wrap; justify-content: center; max-width: 30px; }
+/* Ping */
+.pingc .pbars { display: flex; align-items: flex-end; gap: 1.5px; height: 18px; }
+.pingc .pbars i { width: 3px; border-radius: 1px; background: #34c759; }
+.pingc.ok .pbars i { background: #ffd60a; }
+.pingc.poor .pbars i { background: #ff6961; }
+.pingc .pbars i.none { height: 3px; background: rgba(var(--fg-rgb), .15) !important; }
+.pingc .pbars i.lost { height: 100%; background: rgba(255, 69, 58, .5) !important; }
+.pingc .cval { min-width: 22px; }
+/* Claude sessions */
+.sessc { position: relative; }
+.sessc .sspin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(var(--fg-rgb), .25); box-sizing: border-box; flex: none; }
+.sessc .sspin.on { border-color: rgba(100, 210, 255, .25); border-top-color: #64d2ff; animation: sspin 1.6s steps(8) infinite; }
+@keyframes sspin { to { transform: rotate(360deg); } }
+.sessc .swait { font-style: normal; font-weight: 600; color: #4cd964; }
+.sessc .sbadge { position: absolute; top: 3px; right: 3px; font-style: normal; font-size: 9px; font-weight: 800; min-width: 13px; height: 13px; border-radius: 7px; background: #34c759; color: #000; display: grid; place-items: center; }
+@media (prefers-reduced-motion: reduce) { .sessc .sspin.on { animation: none; } }
+/* Sticker widget: our own characters' motion, hop on click, hearts when petted */
+.cell.sticker { position: relative; padding: 0 6px; overflow: visible; }
+.cell.sticker.bare { background: transparent; border-color: transparent; }
+.cell.sticker.bare:hover { background: transparent; }
+.cell.sticker > span { display: grid; place-items: center; }
+.cell.sticker img { display: block; border-radius: 6px; object-fit: contain; }
+.stk-empty { width: 26px; height: 26px; border-radius: 8px; border: 1px dashed var(--cell-edge); display: grid; place-items: center; opacity: .6; }
+.stk-cat { animation: stk-tilt 6s ease-in-out infinite; transform-origin: 24px 40px; }
+.stk-eyes { animation: stk-blink 4.5s infinite; transform-origin: 24px 26px; }
+.stk-ghost { animation: stk-float 3s ease-in-out infinite; }
+.stk-leaves { animation: stk-sway 3.6s ease-in-out infinite; transform-origin: 24px 31px; }
+.stk-star { animation: stk-twinkle 2.8s ease-in-out infinite; transform-origin: 24px 24px; }
+.stk-sparkle { animation: stk-spark 2.8s ease-in-out infinite; transform-origin: 40px 10px; }
+.stk-blob { animation: stk-squish 2.4s ease-in-out infinite; transform-origin: 24px 42px; }
+.stk-hop { animation: stk-hop .45s cubic-bezier(.3, 1.6, .5, 1); }
+.stk-heart { position: absolute; left: 50%; top: 4px; font-style: normal; color: #ff5c8a; font-size: 14px; pointer-events: none; animation: stk-heart 1.1s ease-out forwards; }
+@keyframes stk-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes stk-tilt { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-4deg); } 75% { transform: rotate(3deg); } }
+@keyframes stk-float { 0%, 100% { transform: translateY(1px); } 50% { transform: translateY(-3px); } }
+@keyframes stk-sway { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes stk-twinkle { 0%, 100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.06) rotate(6deg); } }
+@keyframes stk-spark { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: 1; transform: scale(1.1); } }
+@keyframes stk-squish { 0%, 100% { transform: scale(1, 1); } 45% { transform: scale(1.08, .9); } 60% { transform: scale(.95, 1.06); } }
+@keyframes stk-hop { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-7px) scale(1.06); } 100% { transform: translateY(0) scale(1); } }
+@keyframes stk-heart { 0% { opacity: 0; transform: translate(-50%, 4px) scale(.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -26px) scale(1.15); } }
+@media (prefers-reduced-motion: reduce) { .stk-cat, .stk-eyes, .stk-ghost, .stk-leaves, .stk-star, .stk-sparkle, .stk-blob { animation: none; } }
+.cell.sticker:focus, .cell.sticker:focus-visible { outline: none; box-shadow: none; }
+/* MBTA arrivals cell */
+.cell.transit { gap: 10px; }
+.cell.transit .trow { display: flex; align-items: center; gap: 5px; font-size: 12.5px; white-space: nowrap; }
+.cell.transit .trow i, .tline i { font-style: normal; font-weight: 700; color: #fff; border-radius: 5px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; display: inline-grid; place-items: center; font-size: 11px; }
+.cell.transit .trow small { opacity: .7; font-size: 11px; max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+.cell.transit .trow b { font-variant-numeric: tabular-nums; }
+/* A tucked dock is off screen: stop every animation so the page stops repainting. */
+.dock.tucked * { animation-play-state: paused !important; }
+
+/* Moods: the switcher cell, and the new row fading in after a switch */
+.mood { font-size: 16px; min-width: 34px; justify-content: center; }
+.mood b { font-size: 12.5px; font-weight: 600; margin-left: 5px; }
+.vertical .mood b, .tight2 .mood b { display: none; }
+.moodfade .row { animation: moodfade 150ms ease-out; }
+@keyframes moodfade { from { opacity: .35; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .moodfade .row { animation: none; } }
+
+/* Dragging a pin to a new place */
+.app.dragging { opacity: .55; }
+
+/* Shell buttons */
+.showdesk { width: 8px; min-width: 8px; padding: 0; border-left: 1px solid rgba(var(--fg-rgb), .22); border-radius: 0; background: transparent; }
+.showdesk:hover { background: var(--cell-hover); }
+.vertical .showdesk { width: auto; height: 8px; min-height: 8px; border-left: 0; border-top: 1px solid rgba(var(--fg-rgb), .22); }
+.shellbtn { min-width: 34px; justify-content: center; }
+.kbd { font-size: 12px; font-weight: 700; letter-spacing: .04em; min-width: 34px; justify-content: center; }
+.app.dropon { background: rgba(var(--fg-rgb), .22); border-radius: 10px; }
+.trayi { width: 26px; height: 100%; display: grid; place-items: center; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; border-radius: 7px; }
+.trayi:hover { background: var(--cell-hover); }
+.trayi img { width: 18px; height: 18px; }
+
+/* Everyday widgets (src/widgets/Everyday.tsx) */
+.stock .stext small em { font-style: normal; margin-left: 3px; }
+.stock.up .spark, .stock.up .stext small em, .vertical .stock.up .stext b { color: #30d158; }
+.stock.down .spark, .stock.down .stext small em, .vertical .stock.down .stext b { color: #ff6961; }
+.news { gap: 8px; padding: 0 12px; max-width: 260px; }
+.news.wide { max-width: 440px; }
+.news svg { flex: none; opacity: .8; }
+.news .ntitle { font-size: 12px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.photo { padding: 3px; aspect-ratio: 1; }
+.photo.wide { aspect-ratio: 16 / 10; }
+.photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; display: block; }
+.vertical .photo { padding: 3px; }
+.photo .glyph, .scbtn .glyph { font-size: 15px; opacity: .75; }
+.shortcuts { gap: 2px; padding: 0 4px; }
+.vertical .shortcuts { gap: 2px; padding: 4px 0; }
+.scbtn { all: unset; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; }
+.scbtn:hover { background: var(--cell-hover); }
+.scbtn img { width: 20px; height: 20px; }
+.scbtn .glyph { font-weight: 700; }
+
+/* Spacer (src/widgets/Spacer.tsx) */
+.spacer { flex: none; align-self: stretch; display: grid; place-items: center; border-radius: var(--radius, 10px); }
+.spacer.sz-small { width: 12px; }
+.spacer.sz-medium { width: 32px; }
+.spacer.sz-large { width: 64px; }
+.spacer.sz-fill { flex: 1 1 64px; min-width: 64px; }
+.spacer i { display: block; }
+.spacer.look-line i { width: 1.5px; height: 46%; border-radius: 1px; background: currentColor; opacity: .28; }
+.spacer.look-dot i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: .4; }
+.spacer.look-none i { display: none; }
+.vertical .spacer { width: 100%; }
+.vertical .spacer.sz-small { height: 12px; }
+.vertical .spacer.sz-medium { height: 32px; }
+.vertical .spacer.sz-large { height: 64px; }
+.vertical .spacer.sz-fill { min-height: 64px; min-width: 0; }
+.vertical .spacer.look-line i { width: 46%; height: 1.5px; }
+.dock.editing .spacer { outline: 1.5px dashed rgba(var(--fg-rgb), .45); outline-offset: -4px; }
+
+/* Cells holding several buttons (tray, Recycle Bin, shortcuts): a segmented strip. Each button fills
+   the cell's full height, and the cell's rounded corners clip the end buttons, so a hover always lights
+   the whole button the pointer is on and never a smaller box inside a bigger one. */
+.cell.group { padding: 0; gap: 0; overflow: hidden; }
+.cell.group > button:not(.pill) { flex: none; height: 100%; margin: 0; border: 0; border-radius: 0; background: transparent; color: inherit; transition: background .15s; }
+.cell.group > button:not(.pill):hover { background: var(--cell-hover); }
+.cell.group > .pill { margin: 0 6px 0 2px; }
+.tray .chev:only-child { width: 36px; }
+.shortcuts .scbtn { width: 34px; }
+.vertical .cell.group { padding: 0; }
+.vertical .cell.group > button:not(.pill) { width: 100%; height: 32px; }
+.vertical .recycle .rmain { justify-content: center; padding: 0; }
+.cell.group > .mmain { flex: 0 1 auto; min-width: 0; }
+.media.group .mbtn { width: 30px; }
+
+/* Glass behind this cell is light (the backdrop is bright): dark ink so text and icons stay readable.
+   Set per cell by Dock.tsx from the brightness the glass layer reads back (lib/contrast.ts). */
+.dock [data-bg="light"] {
+  --ink: #16171b; --ink2: rgba(0, 0, 0, 0.6); --fg-rgb: 0, 0, 0;
+  --cell: rgba(0, 0, 0, 0.06); --cell-edge: rgba(0, 0, 0, 0.08); --cell-hover: rgba(0, 0, 0, 0.1);
+  color: var(--ink); text-shadow: 0 0 3px rgba(255, 255, 255, .35);
+  transition: color .3s, background-color .3s;
+}
+
+/* Digits all the same width everywhere on the dock, so clocks, timers and percentages don't jiggle
+   the cells next to them every time a number changes. */
+.dock { font-variant-numeric: tabular-nums; }
