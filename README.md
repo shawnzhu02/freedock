@@ -11,6 +11,8 @@
 menu, the clock and calendar, weather, system stats, media, to-dos, AI usage and more. It's free, it's
 MIT-licensed, and it's built so you (or your coding agent) can change anything about it.
 
+<p align="center"><img src="docs/screenshot.png" alt="freedock at the bottom of the screen with its Start menu and Quick Settings open" width="100%"></p>
+
 ## Why
 
 I wanted a dock like this, and the ones I found cost money. Software this simple to make shouldn't. I
@@ -43,6 +45,8 @@ template. Clone it, tell your agent what you want ("a widget with my Steam frien
   with how close and how long you set yourself.
 - **Your calendar, your to-dos.** Paste a private iCal link from Google, Outlook or iCloud; keep a
   local to-do list; or connect your own [MCP server](docs/MCP_AGENDA.md).
+
+<p align="center"><img src="docs/flyouts.png" alt="Calendar, weather, media and stocks flyouts above the dock" width="100%"></p>
 
 ## freedock and lumabar
 
@@ -88,7 +92,10 @@ Open the folder in Claude Code, Codex, Cursor or Copilot and ask for what you wa
 `npm run new:widget -- "My widget"` scaffolds one. More ideas in [docs/CUSTOMIZING.md](docs/CUSTOMIZING.md).
 Build your own installer with `npm run tauri build`.
 
-You'll need [Node.js](https://nodejs.org) 20+ and [Rust](https://rustup.rs).
+You'll need [Node.js](https://nodejs.org) 20+, [Rust](https://rustup.rs) and Microsoft's
+[C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development
+with C++"; the Rust installer offers to set them up). The first build takes a few minutes; later ones
+are quick.
 
 ## Light on your PC
 
