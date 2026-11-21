@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
 import { SpeakerGlyph, useAudio } from "./Controls";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 type Power = { percent: number | null; charging: boolean; plugged: boolean };
 
@@ -13,8 +13,8 @@ export default function System({ settings }: WidgetProps) {
   useEffect(() => {
     const get = () => invoke<Power>("power").then(setP).catch(() => {});
     get();
-    const t = window.setInterval(() => isActive() && get(), 60_000);
-    return () => clearInterval(t);
+    const stop = pollActive(60_000, () => get());
+    return () => stop();
   }, []);
   // Polled less often than the Volume cell: this is only the icon.
   const { a: audio } = useAudio(5000);
@@ -22,8 +22,8 @@ export default function System({ settings }: WidgetProps) {
   useEffect(() => {
     const get = () => invoke<string>("net_link").then(setLink).catch(() => {});
     get();
-    const t = window.setInterval(() => isActive() && get(), 15_000);
-    return () => clearInterval(t);
+    const stop = pollActive(15_000, () => get());
+    return () => stop();
   }, []);
   const pct = p?.percent ?? null;
   return (

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 export type Audio = { volume: number; muted: boolean; device: string };
 type Power = { percent: number | null; charging: boolean; plugged: boolean; secs_left: number | null };
@@ -43,8 +43,8 @@ export function useAudio(every = 3000) {
   const load = () => invoke<Audio | null>("quick_audio").then(setA).catch(() => {});
   useEffect(() => {
     load();
-    const t = window.setInterval(() => isActive() && load(), every);
-    return () => clearInterval(t);
+    const stop = pollActive(every, () => load());
+    return () => stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [every]);
   return { a, setA, load };
@@ -86,8 +86,8 @@ export function MicCell(p: WidgetProps) {
   const load = () => invoke<Audio | null>("quick_mic").then(setM).catch(() => {});
   useEffect(() => {
     load();
-    const t = window.setInterval(() => isActive() && load(), 3000);
-    return () => clearInterval(t);
+    const stop = pollActive(3000, () => load());
+    return () => stop();
   }, []);
   if (!m) return null;
   return (
@@ -145,8 +145,8 @@ export function BatteryCell(p: WidgetProps) {
   useEffect(() => {
     const get = () => invoke<Power>("power").then(setPw).catch(() => {});
     get();
-    const t = window.setInterval(() => isActive() && get(), 30_000);
-    return () => clearInterval(t);
+    const stop = pollActive(30_000, () => get());
+    return () => stop();
   }, []);
   if (!pw || pw.percent === null) return null;
   const pct = pw.percent;

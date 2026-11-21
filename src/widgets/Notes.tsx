@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
 import { bytes } from "../lib/stats";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 /** First non-empty line of the notes, for the cell. */
 export function firstLine(text: string): string {
@@ -18,8 +18,8 @@ export function NotesCell({ settings, options }: WidgetProps) {
     const get = () => invoke<string>("notes_get").then((t) => setLine(firstLine(t))).catch(() => {});
     get();
     // The flyout saves as the user types; refresh when the dock comes back into view.
-    const t = window.setInterval(() => isActive() && get(), 10_000);
-    return () => clearInterval(t);
+    const stop = pollActive(10_000, () => get());
+    return () => stop();
   }, []);
   const preview = options.preview !== false && !vertical && line;
   return (
@@ -42,8 +42,8 @@ export function RecycleCell({ settings }: WidgetProps) {
   const load = () => invoke<Bin | null>("recycle_bin").then(setBin).catch(() => {});
   useEffect(() => {
     load();
-    const t = window.setInterval(() => isActive() && load(), 60_000);
-    return () => clearInterval(t);
+    const stop = pollActive(60_000, () => load());
+    return () => stop();
   }, []);
   const full = !!bin && bin.items > 0;
   return (

@@ -4,7 +4,7 @@ import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
 import { todayView } from "../lib/agenda";
 import type { TodayView } from "../lib/today";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 /** The agenda's today view for a cell, refreshed every 5 minutes while visible. */
 export function useToday(key = 0, fresh = false) {
@@ -16,8 +16,8 @@ export function useToday(key = 0, fresh = false) {
         .then((x) => (setV(x), setErr("")))
         .catch((e) => setErr(String(e?.message ?? e)));
     get(fresh);
-    const t = window.setInterval(() => isActive() && get(false), 5 * 60_000);
-    return () => clearInterval(t);
+    const stop = pollActive(5 * 60_000, () => get(false));
+    return () => stop();
   }, [key, fresh]);
   return { v, err };
 }

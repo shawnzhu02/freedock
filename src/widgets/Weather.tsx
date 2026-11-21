@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
 import { describe, getWeather, hm, localIso, nextSun, rainSoon, use12h, type Kind, type Weather } from "../lib/weather";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 /** Our own weather glyphs, drawn to sit with the dock's line icons. */
 export function WxIcon({ kind, day = true, size = 22 }: { kind: Kind; day?: boolean; size?: number }) {
@@ -103,10 +103,10 @@ export function useWeather(lat: number, lon: number, unit: "f" | "c") {
         .then((x) => alive && (setW(x), setErr("")))
         .catch((e) => alive && setErr(String(e?.message ?? e)));
     load();
-    const t = window.setInterval(() => isActive() && load(), 5 * 60_000);
+    const stop = pollActive(5 * 60_000, () => load());
     return () => {
       alive = false;
-      clearInterval(t);
+      stop();
     };
   }, [lat, lon, unit]);
   return { w, err };

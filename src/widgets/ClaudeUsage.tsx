@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
 import { FIVE_HOURS, SEVEN_DAYS, level, pct, resetIn, runsOutAt, type Usage, type UsageWindow } from "../lib/usage";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 /** A small ring that fills with the share used. */
 export function Ring({ w, size = 22 }: { w: UsageWindow | null; size?: number }) {
@@ -33,10 +33,10 @@ export function useUsage(everyMin: number) {
         })
         .catch((e) => setErr(String(e)));
     get(everyMin * 60);
-    const t = window.setInterval(() => isActive() && get(everyMin * 60), 60_000);
+    const stop = pollActive(60_000, () => get(everyMin * 60));
     const off = listen("usage-changed", () => get(1e9));
     return () => {
-      clearInterval(t);
+      stop();
       off.then((f) => f());
     };
   }, [everyMin]);

@@ -5,7 +5,7 @@ import type { WidgetProps } from "./registry";
 import { useNow } from "./useNow";
 import { todayView } from "../lib/agenda";
 import { countdown, joinLink, nextMeeting, startingNow, type TodayEvent } from "../lib/today";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 // Meetings whose start already paused the music (module-level so a re-mount doesn't pause twice).
 const paused = new Set<string>();
@@ -17,8 +17,8 @@ export default function Meeting({ settings, options }: WidgetProps) {
   useEffect(() => {
     const get = () => todayView().then((v) => setEvents(v.events)).catch(() => setEvents(null));
     get();
-    const t = window.setInterval(() => isActive() && get(), 5 * 60_000);
-    return () => clearInterval(t);
+    const stop = pollActive(5 * 60_000, () => get());
+    return () => stop();
   }, []);
   const vertical = settings.edge === "left" || settings.edge === "right";
   const length = Number(options.length ?? 60);

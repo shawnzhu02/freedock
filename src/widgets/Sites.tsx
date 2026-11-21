@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 export type Site = { url: string; name: string; up: boolean; code: number; ms: number; error: string | null };
 
@@ -14,8 +14,8 @@ export function useSites(list: string, everyMs: number, key = 0, fresh = false) 
   useEffect(() => {
     const get = (f: boolean) => invoke<Site[]>("sites_check", { list, fresh: f }).then(setS).catch(() => {});
     get(fresh);
-    const t = window.setInterval(() => isActive() && get(false), everyMs);
-    return () => clearInterval(t);
+    const stop = pollActive(everyMs, () => get(false));
+    return () => stop();
   }, [list, everyMs, key, fresh]);
   return s;
 }

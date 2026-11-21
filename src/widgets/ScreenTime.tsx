@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
 import { appName, dur, type StDay } from "../lib/screentime";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 /** Screen Time: today's active time at the PC; the flyout has programs and the week. */
 export default function ScreenTime({ settings }: WidgetProps) {
@@ -13,8 +13,8 @@ export default function ScreenTime({ settings }: WidgetProps) {
     invoke("screentime_watch");
     const get = () => invoke<StDay[]>("screentime_get", { days: 1, icons: false }).then((d) => setToday(d[0] ?? null)).catch(() => {});
     get();
-    const t = window.setInterval(() => isActive() && get(), 60_000);
-    return () => clearInterval(t);
+    const stop = pollActive(60_000, () => get());
+    return () => stop();
   }, []);
   const top = today?.apps[0]?.[0];
   return (

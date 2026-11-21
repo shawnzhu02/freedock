@@ -4,7 +4,7 @@ import type { WidgetProps } from "./registry";
 import { useNow } from "./useNow";
 import { todayView } from "../lib/agenda";
 import { timeline, type TodayEvent } from "../lib/today";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 import { use12h } from "../lib/weather";
 
 const label = (h: number, hour12: boolean) => (hour12 ? `${h % 12 || 12}${h < 12 ? "a" : "p"}` : String(h).padStart(2, "0"));
@@ -16,8 +16,8 @@ export default function Timeline({ settings, options }: WidgetProps) {
   useEffect(() => {
     const get = () => todayView().then((v) => setEvents(v.events)).catch(() => {});
     get();
-    const t = window.setInterval(() => isActive() && get(), 5 * 60_000);
-    return () => clearInterval(t);
+    const stop = pollActive(5 * 60_000, () => get());
+    return () => stop();
   }, []);
   const vertical = settings.edge === "left" || settings.edge === "right";
   if (vertical) return null;

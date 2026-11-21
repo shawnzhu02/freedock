@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
 import { clock } from "../lib/media";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 export type Focus = {
   kind: "" | "focus" | "break" | "timer";
@@ -33,8 +33,8 @@ export function useFocus() {
   }, []);
   useEffect(() => {
     if (!f?.ends_at) return;
-    const t = window.setInterval(() => isActive() && tick((n) => n + 1), 1000);
-    return () => clearInterval(t);
+    const stop = pollActive(1000, () => tick((n) => n + 1));
+    return () => stop();
   }, [f?.ends_at]);
   return f;
 }

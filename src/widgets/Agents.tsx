@@ -4,7 +4,7 @@ import { todayView } from "../lib/agenda";
 import { nextMeeting } from "../lib/today";
 import { useNow } from "./useNow";
 import type { WidgetProps } from "./registry";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 /** Open the agents' popup centred on the clicked cell. */
 export function openAt(mode: string, e: MouseEvent<HTMLElement>, vertical: boolean) {
@@ -48,8 +48,8 @@ export function AgendaCell({ settings }: WidgetProps) {
         .then((v) => setEvents(v.events))
         .catch(() => setEvents(undefined));
     get();
-    const t = window.setInterval(() => isActive() && get(), 5 * 60_000);
-    return () => clearInterval(t);
+    const stop = pollActive(5 * 60_000, () => get());
+    return () => stop();
   }, []);
   const v = vertical(settings);
   const next = events ? nextMeeting(events, now) : null;

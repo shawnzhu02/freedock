@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { isActive } from "./active.ts";
+import { pollActive } from "./active.ts";
 
 export type Pr = { title: string; repo: string; url: string; draft: boolean; review: string; checks: string; updated: string };
 export type Note = { title: string; repo: string; reason: string; kind: string; url: string; updated: string };
@@ -27,8 +27,8 @@ export function useGitHub(every = 5 * 60_000, opened = 0) {
   useEffect(() => {
     const get = (fresh: boolean) => invoke<GitHub>("github_summary", { fresh }).then(setG).catch(() => {});
     get(opened > 0);
-    const t = window.setInterval(() => isActive() && get(false), every);
-    return () => clearInterval(t);
+    const stop = pollActive(every, () => get(false));
+    return () => stop();
   }, [every, opened]);
   return g;
 }

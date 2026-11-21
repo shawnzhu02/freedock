@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 export type Session = { project: string; cwd: string; state: "working" | "waiting" | "stuck"; idle: number };
 
@@ -12,8 +12,8 @@ export function useSessions(everyMs: number, key = 0) {
   useEffect(() => {
     const get = () => invoke<Session[]>("claude_sessions").then(setS).catch(() => setS([]));
     get();
-    const t = window.setInterval(() => isActive() && get(), everyMs);
-    return () => clearInterval(t);
+    const stop = pollActive(everyMs, () => get());
+    return () => stop();
   }, [everyMs, key]);
   return s;
 }

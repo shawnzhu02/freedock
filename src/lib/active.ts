@@ -20,6 +20,13 @@ try {
   // Not inside Tauri (unit tests): always active.
 }
 
+// The window itself coming back (restored, unlocked, uncovered) counts as waking too.
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (isActive()) wakers.forEach((f) => f());
+  });
+}
+
 /** True when this window is on screen and, for the dock, not tucked away. */
 export function isActive(): boolean {
   return document.visibilityState === "visible" && dockShown;
@@ -29,4 +36,28 @@ export function isActive(): boolean {
 export function onWake(f: () => void): () => void {
   wakers.add(f);
   return () => wakers.delete(f);
+}
+
+/** Runs `f` every `ms` while this window is active. A tick that falls while the dock is tucked away (or
+ *  the window is hidden) is skipped, and the skipped work runs as soon as it is back in view. Without
+ *  that, an auto-hiding dock that shows for a few seconds at a time almost never lands on a tick, and a
+ *  battery or Wi-Fi cell could stay minutes or hours out of date. Returns a stop function. */
+export function pollActive(ms: number, f: () => void): () => void {
+  let missed = false;
+  const t = window.setInterval(() => {
+    if (isActive()) {
+      missed = false;
+      f();
+    } else missed = true;
+  }, ms);
+  const off = onWake(() => {
+    if (missed) {
+      missed = false;
+      f();
+    }
+  });
+  return () => {
+    clearInterval(t);
+    off();
+  };
 }

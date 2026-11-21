@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openAt } from "./Agents";
 import { AppIcon } from "./Apps";
 import type { WidgetProps } from "./registry";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 import { usePolled } from "../lib/usePolled";
 import {
   DEFAULT_FEED,
@@ -32,8 +32,8 @@ function useTick(ms: number, on: boolean): number {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!on) return;
-    const t = window.setInterval(() => isActive() && setNow(Date.now()), ms);
-    return () => clearInterval(t);
+    const stop = pollActive(ms, () => setNow(Date.now()));
+    return () => stop();
   }, [ms, on]);
   return now;
 }

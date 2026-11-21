@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
 import { quality, stats } from "../lib/ping";
-import { isActive } from "../lib/active";
+import { pollActive } from "../lib/active";
 
 const KEEP = 24;
 
@@ -15,16 +15,15 @@ function usePing(target: string, everySec: number) {
     setSamples([]);
     let alive = true;
     const go = () => {
-      if (!isActive()) return;
       invoke<number | null>("ping_once", { target })
         .then((ms) => alive && (setErr(""), setSamples((s) => [...s, ms].slice(-KEEP))))
         .catch((e) => alive && setErr(String(e)));
     };
     go();
-    const t = window.setInterval(go, everySec * 1000);
+    const stop = pollActive(everySec * 1000, go);
     return () => {
       alive = false;
-      clearInterval(t);
+      stop();
     };
   }, [target, everySec]);
   return { samples, err };
