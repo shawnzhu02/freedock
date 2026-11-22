@@ -72,7 +72,7 @@ Dock styles are `style-<name>` classes in `src/dock.css` plus an entry in the Lo
 ## Rules (please keep them)
 
 - **Speed.** freedock should cost almost nothing while idle. Poll only while the dock is showing
-  (`isActive()` / `onWake()` from `src/lib/active.ts`), share pollers between cells, prefer events
+  (`pollActive(ms, f)` from `src/lib/active.ts`, which also catches up when the dock reappears), share pollers between cells, prefer events
   over polling in Rust, and skip re-renders when data didn't change. Measure with
   `scripts/perf.ps1` before and after a change that runs all the time.
 - **The taskbar must always come back.** `taskbar.rs` saves the taskbar's state before hiding it and a

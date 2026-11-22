@@ -41,6 +41,7 @@ import Spacer from "./Spacer";
 import { CurrencyCell, HeadlinesCell, PhotoCell, ShortcutsCell, StocksCell } from "./Everyday";
 import { DEFAULT_FEED, DEFAULT_SHORTCUTS, DEFAULT_SYMBOLS } from "../lib/feeds";
 import { Keyboard, Search, ShowDesktop, TaskView } from "./Shell";
+import MoonPhaseCell from "./MoonPhase";
 
 export type Options = Record<string, unknown>;
 export type WidgetProps = { settings: Settings; options: Options };
@@ -314,6 +315,15 @@ export const WIDGETS: WidgetDef[] = [
     id: "sites", name: "Site status", group: "Dev & accounts", blurb: "Whether your sites are up and how fast they answer; red when one is down.", component: SitesCell,
     defaults: { list: "" },
     fields: [{ key: "list", label: "Sites (comma-separated)", type: "text", placeholder: "example.com, myapp.vercel.app" }],
+  },
+  {
+    id: "moon-phase",
+    name: "Moon phase",
+    group: "Everyday",
+    blurb: "Tonight's moon, its phase and how much of it is lit.",
+    component: MoonPhaseCell,
+    defaults: { label: true },
+    fields: [{ key: "label", label: "Show the label", type: "toggle" }],
   },
 ];
 

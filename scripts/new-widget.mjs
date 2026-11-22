@@ -43,7 +43,7 @@ if (!groups.includes(`"${group}"`)) {
 writeFileSync(
   file,
   `import { useEffect, useState } from "react";
-import { isActive, onWake } from "../lib/active";
+import { pollActive } from "../lib/active";
 import type { WidgetProps } from "./registry";
 
 /** ${title}: TODO describe what the cell shows and what a click does.
@@ -52,7 +52,7 @@ import type { WidgetProps } from "./registry";
  *  - It is a React component that renders one \`<button className="cell">\` (or a \`<div>\`) on the dock.
  *  - \`settings\` is the whole dock settings object; \`options\` are this widget's own options (their
  *    defaults and fields are in its registry entry, and Settings > Widgets shows them under the gear).
- *  - Keep it light: poll only while the dock is showing (\`isActive()\`), refresh on \`onWake\`.
+ *  - Keep it light: \`pollActive(ms, f)\` runs f only while the dock is showing, and catches up when it\n *    comes back into view.
  *  - Anything that needs Windows or the network without CORS goes in a Rust command
  *    (src-tauri/src/*.rs, registered in lib.rs) that you call with \`invoke("name", { args })\`.
  *  - To open a flyout on click, add a popup mode (see "Add a flyout" in AGENTS.md) and call
@@ -67,12 +67,7 @@ export default function ${component}({ settings, options }: WidgetProps) {
       setValue(new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
     };
     load();
-    const t = window.setInterval(() => isActive() && load(), 60_000);
-    const off = onWake(load);
-    return () => {
-      clearInterval(t);
-      off();
-    };
+    return pollActive(60_000, load);
   }, []);
 
   const vertical = settings.edge === "left" || settings.edge === "right";

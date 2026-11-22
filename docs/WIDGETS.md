@@ -1,6 +1,6 @@
 # Widgets
 
-Every widget freedock ships with, by group (61 in all). Add them in Settings > Widgets;
+Every widget freedock ships with, by group (62 in all). Add them in Settings > Widgets;
 the gear on a widget shows its options. Generated from `src/widgets/registry.tsx` by
 `npm run docs:widgets`.
 
@@ -97,6 +97,7 @@ To make your own: `npm run new:widget -- "Name"` (see AGENTS.md).
 | Headlines | `news` | The latest headlines from any news site's RSS feed, one at a time; click for the list. |
 | Photo frame | `photo` | A photo from your Pictures (or any folder), changing every few minutes; scroll for another, click to open it. Stays on this PC. |
 | Shortcuts | `shortcuts` | Your own buttons for folders, files, apps, web pages and Settings pages. |
+| Moon phase | `moon-phase` | Tonight's moon, drawn to scale, with the phase name and how much of it is lit. Computed on your PC. |
 
 ## Files & tools
 

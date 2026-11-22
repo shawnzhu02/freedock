@@ -32,7 +32,7 @@ template. Clone it, tell your agent what you want ("a widget with my Steam frien
   Settings, Folders, Documents...). Ctrl+Shift+Enter runs as administrator; right-click opens the file
   location. Plus a pinned grid, recent apps, all apps A-Z and power options. Optionally opens on the
   Windows key; Windows' own Start is one click away.
-- **61 widgets.** Clock, date, world clocks, weather and air quality, calendar with Join buttons, day
+- **62 widgets.** Clock, date, world clocks, weather and air quality, calendar with Join buttons, day
   timeline, to-dos, CPU, GPU, memory, network, media controls, Quick Settings (Wi-Fi, Bluetooth,
   volume, brightness, dark mode...), stocks, currency converter, news headlines, photo frame,
   shortcuts, clipboard history, notes, focus timer, screen time, GitHub,
@@ -58,7 +58,7 @@ freedock.
 |---|---|---|
 | Price | Free | $5.99 one-time |
 | Source code | Open (MIT) | Not published |
-| Widgets | 61 | 100+ |
+| Widgets | 62 | 100+ |
 | Change anything | Yes: edit the code, or ask a coding agent | Settings and options |
 | Account or telemetry | None | None |
 
