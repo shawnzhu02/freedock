@@ -1,6 +1,6 @@
 [package]
 name = "freedock"
-version = "0.1.0"
+version = "0.1.1"
 description = "A glass dock with live widgets for Windows"
 authors = ["freedock contributors"]
 edition = "2024"
