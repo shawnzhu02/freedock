@@ -1,5 +1,5 @@
 // A fake Tauri backend, so the UI can be rendered in a plain browser without touching the real dock.
-// scripts/preview/serve.mjs injects this file before the app's own scripts.
+// build() in scripts/preview/lib.mjs injects this file before the app's own scripts.
 //
 // - Settings come from `settings.json` next to the page, or `settings-<name>.json` with `?set=<name>`.
 // - `#ask` renders the flyout window (pick the flyout with `?mode=<mode>`), `#settings` the Settings

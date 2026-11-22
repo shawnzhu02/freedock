@@ -20,7 +20,12 @@ if (!title) {
 
 const words = title.split(/[^A-Za-z0-9]+/).filter(Boolean);
 const id = words.map((w) => w.toLowerCase()).join("-");
-const name = words.map((w) => w[0].toUpperCase() + w.slice(1)).join("");
+// A name must be a valid identifier: "1Password vault" becomes Widget1PasswordVault.
+const name = words.map((w) => w[0].toUpperCase() + w.slice(1)).join("").replace(/^(?=\d)/, "Widget");
+if (!name) {
+  console.error("Use a name with at least one letter or digit.");
+  process.exit(1);
+}
 const component = `${name}Cell`;
 const file = join(root, "src", "widgets", `${name}.tsx`);
 const registry = join(root, "src", "widgets", "registry.tsx");
@@ -32,6 +37,12 @@ if (existsSync(file)) {
 }
 if (reg.includes(`id: "${id}"`)) {
   console.error(`A widget with id "${id}" is already registered.`);
+  process.exit(1);
+}
+// Another widget's file can export a component with this name already (News.tsx has HeadlinesCell);
+// a second import of it would not compile.
+if (new RegExp(`\\b${component}\\b`).test(reg)) {
+  console.error(`registry.tsx already uses the name ${component}. Pick a different widget name.`);
   process.exit(1);
 }
 const groups = [...reg.matchAll(/export const GROUPS = \[([^\]]*)\]/g)][0]?.[1] ?? "";

@@ -56,6 +56,9 @@ const measure = (since) =>
 
 const rows = [];
 try {
+  // Warm the browser up once (scripts, fonts, cache). Otherwise the first flyout of the run is still
+  // loading when it is opened, and is reported as never ready although it works.
+  await page.open(`${site.url}/?set=flyouts#ask`, 1500);
   for (const [mode, w, h, prefill = ""] of MODES) {
     await page.size(w, h);
     await page.open(`${site.url}/?set=flyouts&lag=1&for=${mode}#ask`, 500);

@@ -11,10 +11,10 @@
 //   node scripts/preview/states.mjs [--out <folder>] [--only <widget-id,...>]
 //
 // Prints the paths of the contact sheets (PNG). Needs Microsoft Edge. Never touches the running dock.
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { browser, build, serve, settingsWith, sleep } from "./lib.mjs";
+import { ROOT, browser, build, serve, settingsWith, sleep } from "./lib.mjs";
 
 const arg = (name) => {
   const i = process.argv.indexOf(name);
@@ -30,7 +30,15 @@ const ROWS = [
   ["ask", "claude", "agenda", "agent", "sessions", "claude-usage", "timeline", "todos", "capture", "projects", "clipboard", "snip", "focus"],
   ["cpu", "ram", "gpu", "top", "network", "storage", "battery", "ping", "screen-time", "power", "volume", "mic", "brightness"],
   ["stocks", "currency", "news", "photo", "downloads", "recent", "screenshots", "notes", "calc", "transit", "github", "docker", "sites", { id: "spacer", options: { size: "large", look: "line" } }],
-].map((row) => (only ? row.filter((w) => only.includes(typeof w === "string" ? w : w.id)) : row)).filter((row) => row.length);
+];
+// Widgets added since the rows above were laid out (every `id: "..."` in the registry) get rows of their own,
+// so a new widget shows up here without editing this file.
+const listed = new Set(ROWS.flat().map((w) => (typeof w === "string" ? w : w.id)));
+const added = [...readFileSync(join(ROOT, "src", "widgets", "registry.tsx"), "utf8").matchAll(/\bid: "([a-z0-9-]+)"/g)]
+  .map((m) => m[1])
+  .filter((id, i, all) => !listed.has(id) && all.indexOf(id) === i);
+for (let i = 0; i < added.length; i += 12) ROWS.push(added.slice(i, i + 12));
+const rows = ROWS.map((row) => (only ? row.filter((w) => only.includes(typeof w === "string" ? w : w.id)) : row)).filter((row) => row.length);
 
 const LOOKS = [
   { name: "bottom-glass", edge: "bottom", style: "glass" },
@@ -40,12 +48,12 @@ const LOOKS = [
 
 mkdirSync(out, { recursive: true });
 const dir = build();
-for (const [r, row] of ROWS.entries()) for (const look of LOOKS) writeFileSync(join(dir, `settings-r${r}-${look.name}.json`), JSON.stringify(settingsWith(row, { edge: look.edge, style: look.style })));
+for (const [r, row] of rows.entries()) for (const look of LOOKS) writeFileSync(join(dir, `settings-r${r}-${look.name}.json`), JSON.stringify(settingsWith(row, { edge: look.edge, style: look.style })));
 const site = await serve(dir);
 const page = await browser();
 const sheets = [];
 try {
-  for (const [r] of ROWS.entries()) {
+  for (const [r] of rows.entries()) {
     for (const look of LOOKS) {
       const vertical = look.edge === "left";
       // The dock window's real size: the bar's thickness (height setting) plus its margins.

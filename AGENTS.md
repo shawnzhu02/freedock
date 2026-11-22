@@ -31,6 +31,37 @@ npm run new:widget -- "Steam friends" --group "Dev & accounts"   # scaffold a wi
 
 Run `npm run check` and `cargo test` before you finish. Both must pass.
 
+## See your change without running the dock
+
+`npm run tauri dev` starts a real dock, which hides the user's taskbar while it runs. To look at UI
+changes, use the preview tools instead. They build the UI against a fake backend
+(`scripts/preview/mock.js`), render it in headless Microsoft Edge, and never touch the running dock:
+
+```sh
+npm run preview:states -- --only weather,moon-phase   # hover sweep: contact sheet of every cell, dark and light, bottom and left edges
+npm run preview:flyouts -- --only quick,media         # opens each flyout the way Rust does and reports flicker
+node scripts/preview/showcase.mjs                     # the README screenshots
+```
+
+Each prints the paths of the images it wrote; open them to check your work. When a widget calls a new
+command, add a sample answer to `data` in `mock.js`, or the preview shows the widget empty. Unknown
+commands return `null`.
+
+## Debug a bug
+
+- **User data** is in `%APPDATA%\freedock\`: `settings.json`, `pins.json`, `todos.json`, `start.json`
+  (launch counts), `taskbar.json` (the saved taskbar state) and `popup.log`.
+- **`popup.log`** traces every flyout: open, the page saying it is ready, reveal, close and safety-net
+  closes. Read it first when a flyout doesn't appear, flickers or won't close.
+- **Self-test:** create an empty file named `selftest` in that folder while the dock runs. It opens
+  several flyouts one after another and logs whether each came up, had focus and was uncloaked.
+- **Rust errors** go to stderr, which shows in the `npm run tauri dev` terminal. Commands return
+  `Result<_, String>`, and the UI gets the message as a rejected `invoke`.
+- **Taskbar stuck hidden:** `freedock.exe --restore-taskbar` (a dev build is at
+  `src-tauri/target/debug/freedock.exe`).
+- **Reproduce first.** If you can, add a failing test next to the code (`src/lib/*.test.ts` for UI
+  logic, `#[cfg(test)] mod tests` in the Rust module), fix it, and keep the test.
+
 ## Recipes
 
 ### Add a widget
@@ -82,6 +113,10 @@ Dock styles are `style-<name>` classes in `src/dock.css` plus an entry in the Lo
   logs or error messages. Nothing is sent anywhere the user didn't set up.
 - **Never steal focus.** The dock window never activates; flyouts take focus only when the user
   opened them on purpose. Hover previews show without focus.
+- **Async answers can arrive late or out of order.** A slow `invoke` started for an old prop (another
+  app, an edited list) must not overwrite the new one: guard with an `alive` flag or a latest-key ref.
+  Every `onKeyDown` that acts on Enter or arrows starts with `if (composing(e)) return;`
+  (`src/lib/ime.ts`), so IME users can pick candidates.
 - **Safety.** Commands that open things validate what they open (see `startmenu::allowed`,
   `open_link`). Power actions ask for a second click.
 - Code comments say *why*, for the next person. Each Rust module starts with a `//!` header saying

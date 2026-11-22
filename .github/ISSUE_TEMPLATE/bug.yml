@@ -21,6 +21,12 @@ body:
     attributes:
       label: Setup
       description: Number of monitors and their scaling, dock position and style, widgets involved.
+  - type: textarea
+    id: log
+    attributes:
+      label: popup.log (for flyout problems)
+      description: 'The end of `%APPDATA%\freedock\popup.log`: it traces every flyout open and close.'
+      render: text
   - type: markdown
     attributes:
-      value: "If the Windows taskbar stays hidden, run `freedock.exe --restore-taskbar`."
+      value: "If the Windows taskbar stays hidden, run `freedock.exe --restore-taskbar`. Want to fix it yourself? Point your coding agent at AGENTS.md (it has a Debug a bug section) and this issue."

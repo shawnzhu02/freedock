@@ -2,6 +2,9 @@ name: Widget idea
 description: A widget, flyout or setting you'd like
 labels: [idea]
 body:
+  - type: markdown
+    attributes:
+      value: "Want it today? Ask your coding agent: *Read AGENTS.md and add a widget that ...*. `npm run new:widget -- \"Name\"` scaffolds it. Pull requests are welcome."
   - type: textarea
     id: idea
     attributes:
