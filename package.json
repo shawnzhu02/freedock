@@ -1,7 +1,7 @@
 {
   "name": "freedock",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,9 @@
     "test": "node --test src/lib/*.test.ts",
     "new:widget": "node scripts/new-widget.mjs",
     "check": "tsc --noEmit && node --test src/lib/*.test.ts",
-    "docs:widgets": "node scripts/widgets-doc.mjs"
+    "docs:widgets": "node scripts/widgets-doc.mjs",
+    "preview:states": "node scripts/preview/states.mjs",
+    "preview:flyouts": "node scripts/preview/flyouts.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
