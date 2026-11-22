@@ -177,7 +177,8 @@ async fn start_find(q: String, index: Option<bool>) -> startmenu::Found {
 #[tauri::command]
 fn start_reveal(app: tauri::AppHandle, path: String) -> Result<(), String> {
     let p = std::path::Path::new(&path);
-    if !p.is_absolute() || !p.exists() {
+    // local_path first: exists() on a UNC path (any slash spelling) contacts that host.
+    if !startmenu::local_path(&path) || !p.exists() {
         return Err("that file is gone".into());
     }
     popup::hide(&app);
@@ -689,6 +690,7 @@ fn autostart_set(app: tauri::AppHandle, on: bool) -> Result<(), String> {
 /// The global shortcuts: one opens the settings panel. Re-registered whenever the settings change.
 mod hotkeys {
     use std::sync::Mutex;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
     #[derive(Clone, Copy, PartialEq, Debug)]
@@ -703,11 +705,24 @@ mod hotkeys {
         Mood(u8),
     }
 
-    /// What is registered now: (key text, shortcut id, action).
-    static CURRENT: Mutex<Vec<(String, u32, Action)>> = Mutex::new(Vec::new());
+    /// One hotkey: (key text, shortcut id, action).
+    type Entry = (String, u32, Action);
 
-    pub fn apply(app: &tauri::AppHandle, s: &crate::settings::Settings) {
-        let mut want = vec![
+    /// What is registered now.
+    static CURRENT: Mutex<Vec<Entry>> = Mutex::new(Vec::new());
+
+    /// The newest wanted set not yet applied, and whether a thread is applying one now. The plugin's
+    /// register/unregister calls block (they hand off to the event loop), so no lock is held across
+    /// them: a second caller (the main thread, while the drag thread applies) only leaves its set here
+    /// and returns, and the thread already applying picks it up.
+    static PENDING: Mutex<Option<Vec<Entry>>> = Mutex::new(None);
+    static BUSY: AtomicBool = AtomicBool::new(false);
+
+    /// The shortcuts the settings ask for, parsed: (key text, shortcut id, action). Empty keys (the
+    /// snip/capture/calc defaults) and text that isn't a shortcut are left out, and a key already
+    /// taken by an earlier action is dropped, so the list is exactly what can be registered.
+    pub(crate) fn wanted(s: &crate::settings::Settings) -> Vec<Entry> {
+        let mut keys = vec![
             (s.hotkey.clone(), Action::Settings),
             (s.ask_hotkey.clone(), Action::Ask),
             (s.ask_selection_hotkey.clone(), Action::AskSelection),
@@ -720,24 +735,12 @@ mod hotkeys {
         if s.mood_number_keys {
             if let Some((mods, _)) = s.mood_hotkey.rsplit_once('+') {
                 for n in 1..=9u8 {
-                    want.push((format!("{mods}+{n}"), Action::Mood(n)));
+                    keys.push((format!("{mods}+{n}"), Action::Mood(n)));
                 }
             }
         }
-        let mut cur = CURRENT.lock().unwrap_or_else(|e| e.into_inner());
-        let same = cur.len() == want.len()
-            && cur
-                .iter()
-                .zip(&want)
-                .all(|((k, _, a), (wk, wa))| k == wk && a == wa);
-        if same {
-            return;
-        }
-        let gs = app.global_shortcut();
-        for (k, _, _) in cur.drain(..) {
-            let _ = gs.unregister(k.as_str());
-        }
-        for (k, action) in want {
+        let mut out: Vec<Entry> = vec![];
+        for (k, action) in keys {
             if k.trim().is_empty() {
                 continue;
             }
@@ -745,11 +748,71 @@ mod hotkeys {
                 eprintln!("hotkey {k}: not a shortcut");
                 continue;
             };
-            match gs.register(sc) {
-                Ok(()) => cur.push((k, sc.id(), action)),
+            if out.iter().any(|(_, id, _)| *id == sc.id()) {
+                eprintln!("hotkey {k}: already used by another action");
+                continue;
+            }
+            out.push((k, sc.id(), action));
+        }
+        out
+    }
+
+    /// What to change to get from `cur` to `want`: (registered entries to drop, wanted entries to
+    /// add). Matched by shortcut id and action, so "ctrl+alt+k" and "Ctrl+Alt+K" count as the same key.
+    pub(crate) fn diff(cur: &[Entry], want: &[Entry]) -> (Vec<Entry>, Vec<Entry>) {
+        let has =
+            |list: &[Entry], (_, id, a): &Entry| list.iter().any(|(_, i, b)| i == id && b == a);
+        let drop = cur.iter().filter(|e| !has(want, e)).cloned().collect();
+        let add = want.iter().filter(|e| !has(cur, e)).cloned().collect();
+        (drop, add)
+    }
+
+    pub fn apply(app: &tauri::AppHandle, s: &crate::settings::Settings) {
+        *PENDING.lock().unwrap_or_else(|e| e.into_inner()) = Some(wanted(s));
+        // Whoever wins BUSY applies every pending set; after letting go it looks once more, so a set
+        // left while it was finishing is never lost.
+        while BUSY
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            loop {
+                // Taken in its own statement, so the lock is released before the plugin calls.
+                let next = PENDING.lock().unwrap_or_else(|e| e.into_inner()).take();
+                let Some(want) = next else { break };
+                sync(app, &want);
+            }
+            BUSY.store(false, Ordering::SeqCst);
+            if PENDING.lock().unwrap_or_else(|e| e.into_inner()).is_none() {
+                break;
+            }
+        }
+    }
+
+    /// Register and unregister only what changed. The settings panel saves on every slider tick, and
+    /// re-registering every key each time briefly drops them all for nothing.
+    fn sync(app: &tauri::AppHandle, want: &[Entry]) {
+        let (drop, add) = diff(&CURRENT.lock().unwrap_or_else(|e| e.into_inner()), want);
+        if drop.is_empty() && add.is_empty() {
+            return;
+        }
+        let gs = app.global_shortcut();
+        for (k, _, _) in &drop {
+            let _ = gs.unregister(k.as_str());
+        }
+        let mut added = vec![];
+        for (k, id, action) in add {
+            // A key another app holds fails here and is tried again on the next save.
+            match k.parse::<Shortcut>().map_err(|e| e.to_string()) {
+                Ok(sc) => match gs.register(sc) {
+                    Ok(()) => added.push((k, id, action)),
+                    Err(e) => eprintln!("hotkey {k}: {e}"),
+                },
                 Err(e) => eprintln!("hotkey {k}: {e}"),
             }
         }
+        let mut cur = CURRENT.lock().unwrap_or_else(|e| e.into_inner());
+        cur.retain(|(_, id, a)| !drop.iter().any(|(_, i, b)| i == id && b == a));
+        cur.extend(added);
     }
 
     pub fn fire(app: &tauri::AppHandle, id: u32) {
@@ -785,6 +848,56 @@ mod hotkeys {
             }
             Some(Action::Mood(n)) => crate::pick_mood(app, n as usize),
             None => {}
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn unchanged_settings_change_nothing() {
+            let s = crate::settings::Settings::default();
+            let want = wanted(&s);
+            assert!(
+                want.iter().all(|(k, _, _)| !k.trim().is_empty()),
+                "empty default keys (snip, capture, calc) are left out"
+            );
+            // What a successful first apply leaves registered.
+            let (drop, add) = diff(&[], &want);
+            assert!(drop.is_empty());
+            assert_eq!(add.len(), want.len());
+            let (drop, add) = diff(&want, &wanted(&s));
+            assert!(
+                drop.is_empty() && add.is_empty(),
+                "a slider tick with the same keys touches no hotkey"
+            );
+        }
+
+        #[test]
+        fn only_the_changed_key_moves() {
+            let mut s = crate::settings::Settings {
+                snip_hotkey: "Ctrl+Alt+S".into(),
+                calc_hotkey: "not a key ++".into(),
+                ..Default::default()
+            };
+            let before = wanted(&s);
+            assert!(before.iter().any(|(_, _, a)| *a == Action::Snip));
+            assert!(!before.iter().any(|(_, _, a)| *a == Action::Calc));
+            s.snip_hotkey = "ctrl+alt+j".into();
+            let (drop, add) = diff(&before, &wanted(&s));
+            assert_eq!(drop.len(), 1);
+            assert_eq!(drop[0].2, Action::Snip);
+            assert_eq!(add.len(), 1);
+            assert_eq!(add[0].0, "ctrl+alt+j");
+        }
+
+        #[test]
+        fn a_key_used_twice_is_registered_once() {
+            let mut s = crate::settings::Settings::default();
+            s.capture_hotkey = s.ask_hotkey.clone();
+            let want = wanted(&s);
+            assert!(!want.iter().any(|(_, _, a)| *a == Action::Capture));
         }
     }
 }
@@ -1613,10 +1726,11 @@ fn pin_app(key: String, on: bool) -> Result<(), String> {
         if on && path.is_empty() {
             return Err("this app can't be pinned".into());
         }
-        let pins = apps::win::pins();
-        let paths: Vec<String> = pins.iter().map(|p| p.0.clone()).collect();
-        let targets: Vec<Option<String>> = pins.iter().map(|p| p.1.clone()).collect();
-        apps::win::save_pins(&apps::pins_edit(&paths, &targets, &path, &key, on))?;
+        apps::win::edit_pins(|pins| {
+            let paths: Vec<String> = pins.iter().map(|p| p.0.clone()).collect();
+            let targets: Vec<Option<String>> = pins.iter().map(|p| p.1.clone()).collect();
+            apps::pins_edit(&paths, &targets, &path, &key, on)
+        })?;
     }
     let _ = (key, on);
     Ok(())
@@ -1633,13 +1747,14 @@ async fn pins_order(keys: Vec<String>) -> Result<(), String> {
 fn order_pins(keys: Vec<String>) -> Result<(), String> {
     #[cfg(windows)]
     {
-        let pins = apps::win::pins();
-        let paths: Vec<String> = pins.iter().map(|p| p.0.clone()).collect();
-        let pin_keys: Vec<String> = pins
-            .iter()
-            .map(|p| p.1.clone().unwrap_or_else(|| p.0.clone()).to_lowercase())
-            .collect();
-        apps::win::save_pins(&apps::pins_reorder(&paths, &pin_keys, &keys))?;
+        apps::win::edit_pins(|pins| {
+            let paths: Vec<String> = pins.iter().map(|p| p.0.clone()).collect();
+            let pin_keys: Vec<String> = pins
+                .iter()
+                .map(|p| p.1.clone().unwrap_or_else(|| p.0.clone()).to_lowercase())
+                .collect();
+            apps::pins_reorder(&paths, &pin_keys, &keys)
+        })?;
     }
     let _ = keys;
     Ok(())
@@ -1765,10 +1880,16 @@ pub fn run() {
         }
         return;
     }
-    // A panic still puts the taskbar back (release builds abort right after this hook).
+    // A panic that ends the dock still puts the taskbar back. Release builds (panic = "abort") end on
+    // every panic, right after this hook. Dev builds unwind: there a panic on another thread only ends
+    // that thread (or is caught, as sta.rs does for its jobs) and the dock keeps running, so restoring
+    // the taskbar and dropping the appbar then would leave a live dock with the old taskbar back.
+    let main_thread = std::thread::current().id();
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        shut_down();
+        if cfg!(panic = "abort") || std::thread::current().id() == main_thread {
+            shut_down();
+        }
         default_hook(info);
     }));
 

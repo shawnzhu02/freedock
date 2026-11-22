@@ -1,6 +1,7 @@
 // Is anyone looking? Pollers ask this before doing work, so a tucked-away dock or a hidden flyout
 // costs nothing. `document.visibilityState` alone isn't enough: tucking the dock only slides it off
 // screen (a CSS transform), so the page still reports "visible".
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -9,6 +10,13 @@ const wakers = new Set<() => void>();
 
 try {
   if (getCurrentWindow().label === "dock") {
+    // Rust sends `dock-visibility` only when it changes, so a dock that starts tucked (Smart with a
+    // maximized window, or Auto-hide) must ask once, or every poller runs until it is first shown.
+    invoke<boolean>("dock_visible")
+      .then((v) => {
+        if (typeof v === "boolean") dockShown = v;
+      })
+      .catch(() => {});
     listen<boolean>("dock-visibility", (e) => {
       const was = dockShown;
       dockShown = e.payload;

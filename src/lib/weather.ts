@@ -32,6 +32,8 @@ export type Weather = {
   days: { date: string; code: number; max: number; min: number; rain: number; sunrise: string; sunset: string }[];
   unit: "f" | "c";
   at: number;
+  /** The city's UTC offset in seconds. Every time above is the city's local time (timezone=auto). */
+  offset: number;
 };
 
 /** Open-Meteo's JSON -> our shape; hours start at the current hour and run 24 ahead. */
@@ -66,6 +68,7 @@ export function parse(j: any, unit: "f" | "c", nowIso: string): Weather {
     hours,
     days,
     unit,
+    offset: j.utc_offset_seconds ?? -new Date().getTimezoneOffset() * 60,
     at: Date.now(),
   };
 }
@@ -88,6 +91,12 @@ export function nextSun(days: Weather["days"], nowIso: string): { what: "sunrise
     if (d.sunset > nowIso) return { what: "sunset", at: d.sunset };
   }
   return null;
+}
+
+/** The time now in a city `offset` seconds from UTC, in Open-Meteo's format. Compare forecast times with
+ *  this, not with the PC's clock: with a city in another time zone the two differ by hours. */
+export function cityIso(offset: number, now = Date.now()): string {
+  return new Date(now + offset * 1000).toISOString().slice(0, 16);
 }
 
 /** "2026-11-16T14:05" in local time, the format Open-Meteo uses with timezone=auto. */
@@ -116,7 +125,7 @@ export function getWeather(lat: number, lon: number, unit: "f" | "c", maxAgeMs =
       if (!r.ok) throw new Error(`Open-Meteo answered ${r.status}`);
       return r.json();
     })
-    .then((j) => parse(j, unit, localIso()));
+    .then((j) => parse(j, unit, typeof j.utc_offset_seconds === "number" ? cityIso(j.utc_offset_seconds) : localIso()));
   cache.set(key, p);
   stamp.set(key, Date.now());
   p.catch(() => {

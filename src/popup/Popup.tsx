@@ -35,6 +35,7 @@ import type { TrayIcon } from "../widgets/Tray";
 import GlassCard from "../widgets/GlassCard";
 import { CurrencyView, NewsView, StocksView } from "./EverydayViews";
 import { getSettings, onSettings, type Settings } from "../settings";
+import { composing } from "../lib/ime";
 
 type Mode = { mode: "ask" | "claude" | "agent" | "tray" | "quick" | "calendar" | "media" | "usage" | "stats" | "weather" | "projects" | "clipboard" | "focus" | "capture" | "downloads" | "screenshots" | "recent" | "notes" | "github" | "screentime" | "docker" | "power" | "todos" | "sites" | "calc" | "sessions" | "transit" | "moods" | "appmenu" | "thumbs" | "start" | "stocks" | "currency" | "news"; prefill: string };
 
@@ -406,6 +407,7 @@ function Ask({ prefill, opened }: { prefill: string; opened: number }) {
           placeholder={image ? "Ask about the screenshot (Enter = describe it)" : selection ? "Ask about the selection (Enter = explain it)" : turns.length ? "Follow up…" : "Ask Claude…"}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
+            if (composing(e)) return;
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               send();
@@ -496,7 +498,7 @@ function Claude({ opened }: { opened: number }) {
           placeholder="Filter, or paste a folder path"
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key !== "Enter") return;
+            if (e.key !== "Enter" || composing(e)) return;
             if (/^[a-zA-Z]:\\/.test(q.trim())) go(q.trim());
             else if (shown[0]) go(shown[0].dir);
           }}
@@ -590,14 +592,14 @@ function Agent({ opened }: { opened: number }) {
           placeholder="Add a to-do (Enter)"
           disabled={busy}
           onChange={(e) => setTodo(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
+          onKeyDown={(e) => !composing(e) && e.key === "Enter" && add()}
         />
         <input
           value={query}
           placeholder="Search (Enter)"
           disabled={busy}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && search()}
+          onKeyDown={(e) => !composing(e) && e.key === "Enter" && search()}
         />
       </div>
       {flash && <p className="note ok">{flash}</p>}

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useKept } from "../lib/kept";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
-import { todayView } from "../lib/agenda";
+import { onAgendaChanged, todayView } from "../lib/agenda";
 import type { TodayView } from "../lib/today";
 import { pollActive } from "../lib/active";
 
@@ -17,7 +17,12 @@ export function useToday(key = 0, fresh = false) {
         .catch((e) => setErr(String(e?.message ?? e)));
     get(fresh);
     const stop = pollActive(5 * 60_000, () => get(false));
-    return () => stop();
+    // A to-do ticked or added in a flyout: show it now, not at the next poll.
+    const off = onAgendaChanged(() => get(true));
+    return () => {
+      stop();
+      off();
+    };
   }, [key, fresh]);
   return { v, err };
 }

@@ -91,11 +91,31 @@ fn file() -> std::path::PathBuf {
     crate::settings::dir().join("screentime.json")
 }
 
-fn load() -> Days {
-    std::fs::read_to_string(file())
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
+/// The saved days. None when the file exists but can't be read right now (locked by a sync tool or
+/// antivirus): callers then neither cache nor save, so a passing read error never replaces 14 days
+/// of history with an empty file. A damaged file is kept as screentime.json.bad and counting starts
+/// over.
+fn load() -> Option<Days> {
+    load_from(&file())
+}
+
+fn load_from(f: &std::path::Path) -> Option<Days> {
+    match std::fs::read_to_string(f) {
+        Ok(s) => Some(serde_json::from_str(&s).unwrap_or_else(|_| {
+            let _ = std::fs::copy(f, f.with_extension("json.bad"));
+            Days::default()
+        })),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Some(Days::default()),
+        Err(_) => None,
+    }
+}
+
+/// The cached days, loading them the first time. None while the file can't be read (see load).
+fn cached(g: &mut Option<Days>) -> Option<&mut Days> {
+    if g.is_none() {
+        *g = Some(load()?);
+    }
+    g.as_mut()
 }
 
 fn save(days: &Days) {
@@ -110,7 +130,10 @@ fn save(days: &Days) {
 
 pub fn get(n: usize) -> Vec<Day> {
     let mut g = DAYS.lock().unwrap_or_else(|e| e.into_inner());
-    summary(g.get_or_insert_with(load), n)
+    match cached(&mut g) {
+        Some(days) => summary(days, n),
+        None => summary(&Days::default(), n),
+    }
 }
 
 /// Start sampling (once; later calls do nothing).
@@ -128,7 +151,8 @@ pub fn watch() {
                 continue;
             }
             let mut g = DAYS.lock().unwrap_or_else(|e| e.into_inner());
-            let days = g.get_or_insert_with(load);
+            // File unreadable for now: drop this sample and try again next step.
+            let Some(days) = cached(&mut g) else { continue };
             add(days, &win::today(), &exe, STEP_SECS);
             unsaved += STEP_SECS;
             if unsaved >= 60 {
@@ -200,6 +224,28 @@ mod tests {
         assert_eq!(s[0].apps[0].name, "firefox");
         assert_eq!(s[1].apps[0].name, "Code");
         assert_eq!(summary(&d, 1).len(), 1);
+    }
+
+    #[test]
+    fn an_unreadable_file_is_never_replaced() {
+        let dir = std::env::temp_dir().join(format!("freedock-st-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        assert_eq!(
+            load_from(&dir.join("none.json")),
+            Some(Days::new()),
+            "no file yet"
+        );
+        // A directory can't be read as a file: stands in for a locked file (not NotFound).
+        assert_eq!(
+            load_from(&dir),
+            None,
+            "read error: nothing to cache or save"
+        );
+        let bad = dir.join("bad.json");
+        std::fs::write(&bad, "{half").unwrap();
+        assert_eq!(load_from(&bad), Some(Days::new()));
+        assert!(bad.with_extension("json.bad").exists(), "damaged file kept");
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

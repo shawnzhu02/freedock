@@ -48,6 +48,11 @@ export default function Media({ opened }: { opened: number }) {
               if (drag !== null) seek(drag);
               setDrag(null);
             }}
+            // Arrow keys, Page Up/Down, Home and End move the slider without a pointer: seek when the key is let go.
+            onKeyUp={() => {
+              if (drag !== null) seek(drag);
+              setDrag(null);
+            }}
           />
           <div className="times">
             <span>{clock(pos)}</span>

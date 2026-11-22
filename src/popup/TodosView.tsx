@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useToday } from "../widgets/Todos";
 import { invalidate } from "../lib/agenda";
 import { dueLabel, ymd, type TodayItem } from "../lib/today";
+import { composing } from "../lib/ime";
 
 /** Local to-dos ("local:<id>") can be ticked and removed here; a connected MCP server's items are
  *  shown read-only (they're ticked off wherever that server lives). */
@@ -85,7 +86,7 @@ export default function TodosView({ opened }: { opened: number }) {
         value={text}
         maxLength={300}
         onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && add()}
+        onKeyDown={(e) => !composing(e) && e.key === "Enter" && add()}
       />
       {note && <p className="note">{note}</p>}
       {!v && !err && <p className="empty center">Loading…</p>}

@@ -416,23 +416,29 @@ pub mod win {
         crate::settings::dir().join("pins.json")
     }
 
+    /// Held while pins.json is read (and maybe imported) and across every load-modify-save, so two
+    /// edits at once (a pin and a reorder from the dock) can't each save over the other's change.
+    static PINS_FILE: Mutex<()> = Mutex::new(());
+
     /// The pinned paths in dock order. The first time, they come from the Windows taskbar's pins.
-    pub fn pin_paths() -> Vec<String> {
-        // Windows' taskbar pins are imported only on the very first run (no pins file yet). A pins
-        // file that can't be read right now (locked) shows no pins rather than being overwritten;
-        // one that's damaged is kept as pins.json.bad and the import runs again.
+    /// Call with PINS_FILE held. Err when pins.json exists but can't be read right now (locked by a
+    /// sync tool or antivirus): callers show no pins, and edits refuse to save, so a passing read
+    /// error never wipes the user's pins.
+    fn pin_paths() -> Result<Vec<String>, String> {
+        // Windows' taskbar pins are imported only on the very first run (no pins file yet). One
+        // that's damaged is kept as pins.json.bad and the import runs again.
         match std::fs::read_to_string(pins_file()) {
             Ok(s) => match serde_json::from_str(&s) {
-                Ok(v) => return v,
+                Ok(v) => return Ok(v),
                 Err(_) => {
                     let _ = std::fs::copy(pins_file(), pins_file().with_extension("json.bad"));
                 }
             },
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(_) => return vec![],
+            Err(e) => return Err(format!("the pins file can't be read right now: {e}")),
         }
         let Some(appdata) = std::env::var_os("APPDATA") else {
-            return vec![];
+            return Ok(vec![]);
         };
         let dir = Path::new(&appdata)
             .join(r"Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar");
@@ -447,10 +453,11 @@ pub mod win {
             .unwrap_or_default();
         lnks.sort();
         let _ = save_pins(&lnks);
-        lnks
+        Ok(lnks)
     }
 
-    pub fn save_pins(paths: &[String]) -> Result<(), String> {
+    /// Only called with PINS_FILE held (pin_paths, edit_pins).
+    fn save_pins(paths: &[String]) -> Result<(), String> {
         let _ = std::fs::create_dir_all(crate::settings::dir());
         let f = pins_file();
         let tmp = f.with_extension("json.tmp");
@@ -464,8 +471,26 @@ pub mod win {
         Ok(())
     }
 
+    /// The pins to show. An unreadable pins file shows none (see pin_paths).
     pub fn pins() -> Pins {
-        let paths = pin_paths();
+        let paths = {
+            let _held = PINS_FILE.lock().unwrap_or_else(|e| e.into_inner());
+            pin_paths()
+        };
+        resolve(paths.unwrap_or_default())
+    }
+
+    /// Change the pins: `f` gets the current pins and returns the new path list, which is saved. The
+    /// whole read-change-save runs under PINS_FILE, and an unreadable pins file refuses the change
+    /// instead of saving `f`'s edit of an empty list over the real one.
+    pub fn edit_pins(f: impl FnOnce(&Pins) -> Vec<String>) -> Result<(), String> {
+        let _held = PINS_FILE.lock().unwrap_or_else(|e| e.into_inner());
+        let pins = resolve(pin_paths()?);
+        save_pins(&f(&pins))
+    }
+
+    /// Each pin's target and name; shortcut targets cost a COM call, so the last answer is kept.
+    fn resolve(paths: Vec<String>) -> Pins {
         if let Some((at, p)) = PINS.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             if *at == paths {
                 return p.clone();
@@ -831,7 +856,9 @@ pub mod win {
         if args.is_empty() {
             return;
         }
-        unsafe {
+        // On the shell's STA lane: callers are pool or plain threads, possibly in the multithreaded
+        // apartment or with no COM at all, where ShellExecute fails for some targets (sta.rs).
+        crate::sta::run(move || unsafe {
             ShellExecuteW(
                 None,
                 w!("open"),
@@ -840,7 +867,7 @@ pub mod win {
                 PCWSTR::null(),
                 SW_SHOWNORMAL,
             );
-        }
+        });
     }
 
     pub fn launch(app: &App) {
@@ -848,7 +875,9 @@ pub mod win {
         if target.is_empty() {
             return;
         }
-        unsafe {
+        // On the shell's STA lane, as in open_with: Win+N clicks come from a plain thread with no
+        // COM, and app clicks from the blocking pool.
+        crate::sta::run(move || unsafe {
             ShellExecuteW(
                 None,
                 w!("open"),
@@ -857,7 +886,7 @@ pub mod win {
                 PCWSTR::null(),
                 SW_SHOWNORMAL,
             );
-        }
+        });
     }
 
     // ---------------------------------------------------------------- live updates

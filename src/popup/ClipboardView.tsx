@@ -3,6 +3,7 @@ import { useKept } from "../lib/kept";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { since } from "../lib/projects";
+import { composing } from "../lib/ime";
 
 type Clip = { id: number; text: string; at: number };
 
@@ -48,6 +49,7 @@ export default function ClipboardView({ opened }: { opened: number }) {
             setSel(0);
           }}
           onKeyDown={(e) => {
+            if (composing(e)) return;
             if (e.key === "ArrowDown") setSel((n) => Math.min(shown.length - 1, n + 1));
             else if (e.key === "ArrowUp") setSel((n) => Math.max(0, n - 1));
             else if (e.key === "Enter" && shown[sel]) copy(shown[sel]);

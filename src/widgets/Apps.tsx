@@ -12,24 +12,38 @@ type App = { key: string; name: string; pinned: boolean; lnk: string | null; exe
 /** Icons by source path, fetched once per program for the life of the dock. */
 const icons = new Map<string, string | null>();
 const asked = new Set<string>();
+/** Every mounted icon waiting on a source, so all copies of an app (Pinned and All apps in Start, say)
+ *  redraw when its icon arrives, not only the one that asked first. */
+const waiting = new Map<string, Set<() => void>>();
+const wake = (src: string) => waiting.get(src)?.forEach((f) => f());
 
 export function AppIcon({ src, name }: { src: string | null; name: string }) {
   const [tries, redraw] = useState(0);
   useEffect(() => {
-    if (!src || icons.get(src) || asked.has(src)) return;
-    asked.add(src);
-    invoke<string | null>("app_icon", { path: src })
-      .then((u) => icons.set(src, u ?? null))
-      .catch(() => icons.set(src, null))
-      .finally(() => {
-        redraw((n) => n + 1);
-        // No icon this time (the program was busy, or Windows wasn't ready): ask again later.
-        if (!icons.get(src) && tries < 3)
-          setTimeout(() => {
-            asked.delete(src);
-            redraw((n) => n + 1);
-          }, 30_000);
-      });
+    if (!src || icons.get(src)) return;
+    const f = () => redraw((n) => n + 1);
+    let set = waiting.get(src);
+    if (!set) waiting.set(src, (set = new Set()));
+    set.add(f);
+    if (!asked.has(src)) {
+      asked.add(src);
+      invoke<string | null>("app_icon", { path: src })
+        .then((u) => icons.set(src, u ?? null))
+        .catch(() => icons.set(src, null))
+        .finally(() => {
+          wake(src);
+          // No icon this time (the program was busy, or Windows wasn't ready): ask again later.
+          if (!icons.get(src) && tries < 3)
+            setTimeout(() => {
+              asked.delete(src);
+              wake(src);
+            }, 30_000);
+        });
+    }
+    return () => {
+      set.delete(f);
+      if (!set.size) waiting.delete(src);
+    };
   }, [src, tries]);
   const url = src ? icons.get(src) : null;
   return url ? <img src={url} alt="" draggable={false} /> : <span className="glyph">{name.slice(0, 1)}</span>;

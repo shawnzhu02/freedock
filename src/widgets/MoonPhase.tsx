@@ -21,6 +21,8 @@ export function MoonGlyph({ moon, size = 18 }: { moon: Moon; size?: number }) {
     <svg className="moonglyph" viewBox={`0 0 ${size} ${size}`} width={size} height={size} aria-hidden="true">
       <circle cx={r} cy={r} r={r - 0.5} fill="currentColor" opacity=".18" />
       {moon.lit > 0.005 && <path d={litPath(moon, r)} fill="#f6f1d8" />}
+      {/* The rim keeps a pale moon visible on light docks (white, glass over a light wallpaper). */}
+      <circle cx={r} cy={r} r={r - 0.5} fill="none" stroke="currentColor" strokeOpacity=".35" strokeWidth="1" />
     </svg>
   );
 }

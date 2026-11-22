@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { describe as wx, hm, localIso, nextSun, parse, rainSoon, type Weather } from "./weather.ts";
+import { cityIso, describe as wx, hm, localIso, nextSun, parse, rainSoon, type Weather } from "./weather.ts";
 
 test("WMO codes", () => {
   assert.deepEqual(wx(0), { kind: "clear", label: "Clear" });
@@ -52,7 +52,7 @@ test("parse starts hours at now", () => {
 test("rain soon: first wet hour in the next three, not when it's already raining", () => {
   const hour = (time: string, code: number, rain: number) => ({ time, temp: 50, code, day: true, rain });
   const base: Weather = {
-    temp: 50, feels: 48, code: 1, day: true, wind: 5, humidity: 60, unit: "f", at: 0, days: [],
+    temp: 50, feels: 48, code: 1, day: true, wind: 5, humidity: 60, unit: "f", at: 0, offset: 0, days: [],
     hours: [hour("2026-11-16T14:00", 1, 10), hour("2026-11-16T15:00", 2, 20), hour("2026-11-16T16:00", 61, 70), hour("2026-11-16T17:00", 63, 90)],
   };
   assert.deepEqual(rainSoon(base), { time: "2026-11-16T16:00", chance: 70, kind: "rain" });
@@ -60,4 +60,11 @@ test("rain soon: first wet hour in the next three, not when it's already raining
   assert.equal(rainSoon(base, 1), null, "only an hour ahead");
   const dry = { ...base, hours: base.hours.map((h) => ({ ...h, code: 1, rain: 10 })) };
   assert.equal(rainSoon(dry), null);
+});
+
+test("city clock: forecast times are compared with the city's time, not the PC's", () => {
+  const t = Date.UTC(2026, 10, 21, 15, 30); // 15:30 UTC
+  assert.equal(cityIso(0, t), "2026-11-21T15:30"); // London in November
+  assert.equal(cityIso(-5 * 3600, t), "2026-11-21T10:30"); // Boston
+  assert.equal(cityIso(9 * 3600, t), "2026-11-22T00:30"); // Tokyo, already tomorrow
 });

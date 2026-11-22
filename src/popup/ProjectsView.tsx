@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { filter, since, type Project } from "../lib/projects";
+import { composing } from "../lib/ime";
 
 const ACTIONS: { how: string; label: string; title: string }[] = [
   { how: "code", label: "Code", title: "Open in VS Code" },
@@ -44,6 +45,7 @@ export default function ProjectsView({ opened }: { opened: number }) {
             setSel(0);
           }}
           onKeyDown={(e) => {
+            if (composing(e)) return;
             if (e.key === "ArrowDown") setSel((n) => Math.min(shown.length - 1, n + 1));
             else if (e.key === "ArrowUp") setSel((n) => Math.max(0, n - 1));
             else if (e.key === "Enter" && shown[sel]) open(shown[sel], e.ctrlKey ? "claude" : e.shiftKey ? "terminal" : "code");

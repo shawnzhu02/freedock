@@ -139,7 +139,8 @@ let gpuLoop = 0;
 
 async function gpuTick(loop = gpuLoop) {
   const { invoke } = await import("@tauri-apps/api/core");
-  try {
+  // Tucked away or hidden: skip the read, like tick() (onWake starts a fresh loop at once).
+  if (isActive()) try {
     const g = await invoke<Gpu[]>("gpu_stats");
     gpuLast = g;
     gpuHistory.push(g[0]?.load ?? 0);
@@ -163,7 +164,15 @@ export function useGpu(): { g: Gpu[] | null; history: number[] } {
       gpuTimer = -1;
       gpuTick(++gpuLoop);
     }
+    const offWake = onWake(() => {
+      // One restart per wake, however many cells show the GPU: only the oldest listener does it.
+      if (gpuListeners.values().next().value !== f) return;
+      clearTimeout(gpuTimer);
+      gpuTimer = -1;
+      gpuTick(++gpuLoop);
+    });
     return () => {
+      offWake();
       gpuListeners.delete(f);
       if (!gpuListeners.size) {
         clearTimeout(gpuTimer);

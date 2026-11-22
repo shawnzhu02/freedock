@@ -103,10 +103,29 @@ fn stamp(params: &[(String, String)], value: &str) -> Stamp {
 pub fn parse_ics(text: &str) -> Vec<VEvent> {
     let mut out = vec![];
     let mut cur: Option<VEvent> = None;
+    // How deep we are inside sub-components of the current VEVENT (VALARM, or any other). Their
+    // properties describe the sub-component, not the event: Google's reminder VALARM carries its own
+    // DESCRIPTION ("This is an event reminder"), SUMMARY and sometimes UID, which would otherwise
+    // overwrite the event's.
+    let mut nested = 0u32;
     for line in unfold(text) {
         let Some((name, params, value)) = split_prop(&line) else {
             continue;
         };
+        if cur.is_some() {
+            match name.as_str() {
+                "BEGIN" => {
+                    nested += 1;
+                    continue;
+                }
+                "END" if nested > 0 => {
+                    nested -= 1;
+                    continue;
+                }
+                _ if nested > 0 => continue,
+                _ => {}
+            }
+        }
         match (name.as_str(), &mut cur) {
             ("BEGIN", None) if value.eq_ignore_ascii_case("VEVENT") => {
                 cur = Some(VEvent::default())
@@ -645,6 +664,22 @@ mod tests {
         assert_eq!(ev[1].description, "Join https://acme.zoom.us/j/123  please");
         assert!(ev[2].start.as_ref().unwrap().date_only);
         assert!(ev[4].cancelled);
+    }
+
+    #[test]
+    fn alarm_inside_an_event_keeps_its_own_fields() {
+        let cal = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:evt-1@google.com\r\nSUMMARY:Dentist\r\nDESCRIPTION:Bring the form\r\nDTSTART:20261116T090000Z\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:This is an event reminder\r\nSUMMARY:Alarm notification\r\nUID:alarm-1\r\nTRIGGER:-P0DT0H30M0S\r\nEND:VALARM\r\nLOCATION:Main St\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:evt-2\r\nSUMMARY:After\r\nDTSTART:20261116T100000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+        let ev = parse_ics(cal);
+        assert_eq!(ev.len(), 2, "the VALARM's END doesn't end the event");
+        assert_eq!(ev[0].uid, "evt-1@google.com");
+        assert_eq!(ev[0].summary, "Dentist");
+        assert_eq!(ev[0].description, "Bring the form");
+        assert_eq!(
+            ev[0].location, "Main St",
+            "properties after the VALARM still count"
+        );
+        assert_eq!(ev[1].uid, "evt-2");
+        assert_eq!(ev[1].summary, "After");
     }
 
     #[test]

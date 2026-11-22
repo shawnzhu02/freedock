@@ -104,8 +104,11 @@ pub fn take_over() {
 /// Quit (and the panic hook, the guard, `--restore-taskbar`): put the taskbar back as we found it.
 /// Safe to call more than once. Showing the tray windows is unconditional: it is harmless when they
 /// are already visible, and the only way back after a hard kill.
+///
+/// Order matters when another dock is still running (`--restore-taskbar` from a second process): the
+/// clean note is written before the trays are shown, so that dock's show-event hook (`rehide_if_tray`)
+/// already reads "released" and leaves them alone instead of hiding them again.
 pub fn restore() {
-    win::show_trays(true);
     let file = state_file();
     if let Some(state) = pending_restore(&file) {
         // The user's own taskbar was auto-hide too: switching it off and on again makes Explorer
@@ -115,20 +118,21 @@ pub fn restore() {
         }
         win::set_state(state);
         // Explorer down or restarting: the change didn't take, so leave the note for the next try
-        // (the next start, or `--restore-taskbar`).
-        if win::get_state() != state {
+        // (the next start, or `--restore-taskbar`). The trays are still shown below.
+        if win::get_state() == state {
+            write(
+                &file,
+                Saved {
+                    state,
+                    dirty: false,
+                    owner: 0,
+                },
+            );
+        } else {
             eprintln!("taskbar: Windows didn't take the restored state; will retry next start");
-            return;
         }
-        write(
-            &file,
-            Saved {
-                state,
-                dirty: false,
-                owner: 0,
-            },
-        );
     }
+    win::show_trays(true);
 }
 
 /// Start the guard: a second copy of this exe that restores the taskbar once `pid` exits.
@@ -338,9 +342,11 @@ pub mod win {
     /// Hide any real taskbar that came back without a show event we saw (Explorer re-shows it when
     /// apps are asked to re-add tray icons). Cheap: one window enumeration.
     pub fn enforce() {
-        // Restored from outside (`--restore-taskbar` while this dock still runs): stop hiding it.
+        // Restored from outside (`--restore-taskbar` while this dock still runs): stop hiding it, and
+        // show the trays ourselves, since a show the other process made may have been undone by
+        // `rehide_if_tray` before the note turned clean. show_trays(true) also clears HIDDEN.
         if HIDDEN.load(Ordering::SeqCst) && super::released(&super::state_file()) {
-            HIDDEN.store(false, Ordering::SeqCst);
+            show_trays(true);
             return;
         }
         if HIDDEN.load(Ordering::SeqCst) {
@@ -362,7 +368,14 @@ pub mod win {
 
     pub fn rehide_if_tray(raw: isize) {
         let h = HWND(raw as *mut _);
-        if HIDDEN.load(Ordering::SeqCst) && is_real_tray(h) && should_hide(h) {
+        // The released check reads taskbar.json, so it goes last: only real taskbar shows reach it.
+        // Released means `--restore-taskbar` brought the bar back on purpose; `enforce` then stops
+        // hiding for good.
+        if HIDDEN.load(Ordering::SeqCst)
+            && is_real_tray(h)
+            && should_hide(h)
+            && !super::released(&super::state_file())
+        {
             unsafe {
                 let _ = ShowWindow(h, SW_HIDE);
             }

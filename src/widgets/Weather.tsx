@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { openAt } from "./Agents";
 import type { WidgetProps } from "./registry";
-import { describe, getWeather, hm, localIso, nextSun, rainSoon, use12h, type Kind, type Weather } from "../lib/weather";
+import { cityIso, describe, getWeather, hm, nextSun, rainSoon, use12h, type Kind, type Weather } from "../lib/weather";
 import { pollActive } from "../lib/active";
 
 /** Our own weather glyphs, drawn to sit with the dock's line icons. */
@@ -173,12 +173,13 @@ export function SunCell(props: WidgetProps) {
 function SunReady({ settings }: WidgetProps) {
   const { w } = useWeather(settings.lat, settings.lon, "f");
   const vertical = settings.edge === "left" || settings.edge === "right";
-  const [now, setNow] = useState(localIso());
+  // Re-render every minute; sunrise and sunset are the city's local times, so compare with the city's clock.
+  const [, tick] = useState(0);
   useEffect(() => {
-    const t = window.setInterval(() => setNow(localIso()), 60_000);
+    const t = window.setInterval(() => tick((n) => n + 1), 60_000);
     return () => clearInterval(t);
   }, []);
-  const next = w ? nextSun(w.days, now) : null;
+  const next = w ? nextSun(w.days, cityIso(w.offset)) : null;
   return (
     <button className="cell weather sun" title={next ? `${next.what === "sunrise" ? "Sunrise" : "Sunset"} at ${hm(next.at, use12h(settings.hour12))}` : "Sunrise & sunset"} onClick={(e) => openAt("weather", e, vertical)}>
       <svg viewBox="0 0 24 24" width="22" height="22" className="wx" aria-hidden="true">

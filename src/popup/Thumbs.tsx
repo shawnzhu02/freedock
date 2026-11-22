@@ -22,10 +22,14 @@ function layoutBox(el: HTMLElement) {
 export default function Thumbs({ appKey, opened, fade }: { appKey: string; opened: number; fade: boolean }) {
   const [app, setApp] = useState<App | null>(null);
   const boxes = useRef<(HTMLDivElement | null)[]>([]);
+  // apps_list is slow and answers can come back out of order: when the pointer has moved on to
+  // another app, an answer for the previous one must not land here.
+  const latest = useRef(appKey);
+  latest.current = appKey;
   const load = () =>
     invoke<App[]>("apps_list")
-      .then((l) => setApp(l.find((a) => a.key === appKey) ?? null))
-      .catch(() => setApp(null));
+      .then((l) => latest.current === appKey && setApp(l.find((a) => a.key === appKey) ?? null))
+      .catch(() => latest.current === appKey && setApp(null));
   useEffect(() => {
     load();
   }, [appKey, opened]);

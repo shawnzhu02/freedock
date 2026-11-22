@@ -5,6 +5,7 @@ import { AppIcon } from "../widgets/Apps";
 import { useSections } from "./Sections";
 import { useReorder } from "../lib/useReorder";
 import { SETTINGS_PAGES, rankName } from "../lib/start";
+import { composing } from "../lib/ime";
 
 // freedock's own Start menu (src-tauri/src/startmenu.rs). Type to search the way Windows' Start
 // does: apps, programs and files from the Windows Search index, and the Settings index, ranked by
@@ -237,6 +238,7 @@ export default function StartView({ opened }: { opened: number }) {
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => {
           if (!hits.length) return;
+          if (composing(e)) return;
           if (e.key === "ArrowDown") (e.preventDefault(), setSel((s) => Math.min(hits.length - 1, s + 1)));
           if (e.key === "ArrowUp") (e.preventDefault(), setSel((s) => Math.max(0, s - 1)));
           // Ctrl+Shift+Enter runs the app as administrator, as in Windows' Start.

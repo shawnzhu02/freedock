@@ -59,7 +59,10 @@ impl Lane {
                     #[cfg(not(windows))]
                     let _ = sta;
                     for job in rx {
-                        // A panicking job must not take the lane down with it.
+                        // A panicking job must not take the lane down with it. This only holds
+                        // where panics unwind (dev builds and tests). Release builds use
+                        // panic = "abort", so there a panicking job ends the dock, and the panic
+                        // hook (lib.rs) and the guard process restore the taskbar.
                         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job));
                     }
                 })

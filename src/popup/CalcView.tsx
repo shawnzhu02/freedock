@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { evaluate, show } from "../lib/calc";
+import { composing } from "../lib/ime";
 
 type Line = { expr: string; value: number };
 
@@ -52,6 +53,7 @@ export default function CalcView({ opened }: { opened: number }) {
           spellCheck={false}
           onChange={(e) => setExpr(e.target.value)}
           onKeyDown={(e) => {
+            if (composing(e)) return;
             if (e.key === "Enter") keep();
             if (e.key === "Escape") invoke("popup_close");
             if (e.key === "ArrowUp" && !expr && lines[0]) setExpr(lines[0].expr);

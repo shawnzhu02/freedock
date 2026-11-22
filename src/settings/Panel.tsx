@@ -21,6 +21,7 @@ import { GROUPS, WIDGETS, byId, type OptionField } from "../widgets/registry";
 import { useReorder } from "../lib/useReorder";
 import GlassCard from "../widgets/GlassCard";
 import { activeMood, newMood, ownLook, patchMood } from "../lib/moods";
+import { composing } from "../lib/ime";
 
 const TABS = ["Look", "Widgets", "General", "About"] as const;
 type Tab = (typeof TABS)[number];
@@ -276,7 +277,7 @@ function MoodsBar({ s, update, switchMood }: TabProps & { switchMood: (id: strin
               maxLength={24}
               onChange={(e) => update(patchMood(s, m.id, { name: e.target.value }))}
               onBlur={() => setRenaming(false)}
-              onKeyDown={(e) => e.key === "Enter" && setRenaming(false)}
+              onKeyDown={(e) => !composing(e) && e.key === "Enter" && setRenaming(false)}
             />
           ) : (
             <button className="move" onClick={() => setRenaming(true)}>

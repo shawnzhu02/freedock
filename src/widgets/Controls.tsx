@@ -110,7 +110,17 @@ export function BrightnessCell(p: WidgetProps) {
   const [b, setB] = useState<number | null | undefined>(undefined);
   const pending = useRef(0);
   useEffect(() => {
-    invoke<number | null>("quick_brightness").then(setB).catch(() => setB(null));
+    // Fn keys, Quick Settings and Windows' own slider change it too, so keep reading it while the dock shows.
+    // A read while the wheel is still sending would undo the step the user just made, so skip those.
+    const load = () => {
+      if (!pending.current) invoke<number | null>("quick_brightness").then(setB).catch(() => setB(null));
+    };
+    load();
+    const stop = pollActive(15_000, load);
+    return () => {
+      stop();
+      clearTimeout(pending.current);
+    };
   }, []);
   if (b === undefined || b === null) return null;
   const wheel = (e: React.WheelEvent) => {
@@ -118,7 +128,13 @@ export function BrightnessCell(p: WidgetProps) {
     setB(next);
     clearTimeout(pending.current);
     // Setting it goes through WMI and takes a moment: send only where the wheel stops.
-    pending.current = window.setTimeout(() => invoke("quick_set_brightness", { level: next }), 250);
+    pending.current = window.setTimeout(() => {
+      pending.current = 0;
+      invoke("quick_set_brightness", { level: next })
+        .then(() => invoke<number | null>("quick_brightness"))
+        .then((v) => v != null && !pending.current && setB(v))
+        .catch(() => {});
+    }, 250);
   };
   return (
     <button className="cell stat ctl" title={`Brightness ${b}%. Scroll to change.`} onWheel={wheel} onClick={(e) => openAt("quick", e, isVertical(p))}>

@@ -12,10 +12,22 @@ export const DEFAULT_SITES = "";
 export function useSites(list: string, everyMs: number, key = 0, fresh = false) {
   const [s, setS] = useState<Site[] | null>(null);
   useEffect(() => {
-    const get = (f: boolean) => invoke<Site[]>("sites_check", { list, fresh: f }).then(setS).catch(() => {});
+    // Checks are slow (they wait on each site's timeout): an answer for the list before an edit, or
+    // an older poll, must not land on top of a newer one.
+    let alive = true;
+    let seq = 0;
+    const get = (f: boolean) => {
+      const n = ++seq;
+      invoke<Site[]>("sites_check", { list, fresh: f })
+        .then((v) => alive && n === seq && setS(v))
+        .catch(() => {});
+    };
     get(fresh);
     const stop = pollActive(everyMs, () => get(false));
-    return () => stop();
+    return () => {
+      alive = false;
+      stop();
+    };
   }, [list, everyMs, key, fresh]);
   return s;
 }

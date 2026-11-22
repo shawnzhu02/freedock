@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ymd } from "../lib/today";
 import { invalidate } from "../lib/agenda";
+import { composing } from "../lib/ime";
 
 const WHEN: { key: string; label: string; date: () => string }[] = [
   { key: "today", label: "Today", date: () => "" },
@@ -66,6 +67,7 @@ export default function CaptureView({ opened }: { opened: number }) {
             disabled={busy}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
+              if (composing(e)) return;
               if (e.key === "Enter") {
                 e.preventDefault();
                 add();

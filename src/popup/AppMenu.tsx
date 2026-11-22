@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useKept } from "../lib/kept";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -9,10 +9,14 @@ type App = { key: string; name: string; pinned: boolean; windows: Win[] };
  *  and Close window(s). Closing asks the window to close, so apps can still ask to save. */
 export default function AppMenu({ appKey, opened }: { appKey: string; opened: number }) {
   const [app, setApp] = useKept<App | null | undefined>(`appmenu.${appKey}`, undefined);
+  // apps_list is slow and answers can come back out of order: when the pointer has moved on to
+  // another app, an answer for the previous one must not land here.
+  const latest = useRef(appKey);
+  latest.current = appKey;
   const load = () =>
     invoke<App[]>("apps_list")
-      .then((l) => setApp(l.find((a) => a.key === appKey) ?? null))
-      .catch(() => setApp(null));
+      .then((l) => latest.current === appKey && setApp(l.find((a) => a.key === appKey) ?? null))
+      .catch(() => latest.current === appKey && setApp(null));
   useEffect(() => {
     load();
   }, [appKey, opened]);

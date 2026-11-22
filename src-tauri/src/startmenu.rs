@@ -164,16 +164,30 @@ pub fn save_state(s: &StartState) -> Result<(), String> {
 }
 
 /// Only these may be opened from the Start menu: apps by their shell name, Settings pages, and
-/// files or folders that exist.
+/// files or folders that exist. Callers pass targets with %VARIABLES% already expanded (the Shortcuts
+/// widget expands them in `feeds::parse_shortcuts`), so the check sees the real path.
 pub fn allowed(target: &str) -> bool {
-    // Network paths are refused: checking one can hang for the network timeout and sends your
-    // Windows sign-in to that host.
-    let network = target.starts_with(r"\\") || target.starts_with("//");
     target.starts_with(r"shell:AppsFolder\")
         || target.starts_with("ms-settings:")
-        || !network
-            && std::path::Path::new(target).is_absolute()
-            && std::path::Path::new(target).exists()
+        || local_path(target) && std::path::Path::new(target).exists()
+}
+
+/// An absolute path on a local drive (`C:\...`), checked before anything touches it on disk.
+/// Network paths are refused: checking one can hang for the network timeout, and touching an SMB
+/// share sends your Windows sign-in (an NTLM hash) to that host. Windows reads `/` as `\`, so
+/// `/\host\share` and `\/host\share` are UNC paths too; the parsed prefix catches every spelling.
+/// Verbatim (`\\?\`) and device (`\\.\`) paths are refused as well: nothing in Start or the
+/// Shortcuts widget needs them, and they reach shares, volumes and devices by other names.
+pub fn local_path(target: &str) -> bool {
+    use std::path::{Component, Path, Prefix};
+    let network = target.starts_with(r"\\") || target.starts_with("//");
+    let p = Path::new(target);
+    // Off Windows there is no prefix; on Windows an absolute path always has one.
+    let local_prefix = match p.components().next() {
+        Some(Component::Prefix(pre)) => matches!(pre.kind(), Prefix::Disk(_)),
+        _ => true,
+    };
+    !network && local_prefix && p.is_absolute()
 }
 
 /// A query made safe for a URL's query string.
@@ -212,11 +226,8 @@ pub mod win {
             .iter()
             .map(|v| {
                 let base = std::env::var_os(v)?;
-                let sub = if *v == "ProgramData" {
-                    r"Microsoft\Windows\Start Menu\Programs"
-                } else {
-                    r"Microsoft\Windows\Start Menu\Programs"
-                };
+                // The same subfolder under both: all users' and this user's Start Menu.
+                let sub = r"Microsoft\Windows\Start Menu\Programs";
                 std::fs::metadata(std::path::Path::new(&base).join(sub))
                     .and_then(|m| m.modified())
                     .ok()
@@ -525,6 +536,9 @@ mod tests {
         assert!(!allowed("calc.exe"));
         assert!(!allowed(r"\\server\share\x.exe"));
         assert!(!allowed(r"\\?\UNC\server\share\x.exe"));
+        assert!(!local_path(r"\\server\share\x.exe"));
+        assert!(!local_path("//server/share/x.exe"));
+        assert!(!local_path(r"relative\x.exe"));
         assert_eq!(url_encode("a b&c"), "a+b%26c");
         assert!(is_document(
             "{X}/7-Zip/7-zip.chm".replace('/', "\\").as_str()
@@ -532,6 +546,32 @@ mod tests {
         assert!(!is_document(
             "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
         ));
+    }
+
+    /// Windows reads `/` as `\`, so mixed-slash spellings are network paths too. Only Windows parses
+    /// path prefixes, so this runs there.
+    #[cfg(windows)]
+    #[test]
+    fn mixed_slash_network_and_device_paths_are_refused() {
+        for p in [
+            r"/\server\share\x.exe",
+            r"\/server\share\x.exe",
+            r"\\?\UNC\server\share\x.exe",
+            r"\\.\pipe\x",
+            r"\\.\COM1",
+            r"\\?\C:\Windows",
+            r"\\?\GLOBALROOT\Device\x",
+        ] {
+            assert!(!local_path(p), "{p} must be refused");
+            assert!(!allowed(p), "{p} must be refused");
+        }
+        assert!(local_path(r"C:\Windows\notepad.exe"));
+        assert!(local_path("C:/Windows/notepad.exe"));
+        assert!(
+            !local_path("C:relative.exe"),
+            "drive-relative isn't absolute"
+        );
+        assert!(allowed(r"C:\Windows"));
     }
 }
 
